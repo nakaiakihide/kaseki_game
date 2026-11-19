@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>カセキ交配バトル 試作v11</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; }
+  body {
+    font-family:"Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif;
+    background:#2b2118; color:#2b2118; overflow:hidden;
+    display:flex; justify-content:center;
+  }
+  #app {
+    width:100%; max-width:480px; height:100dvh; background:#f7ead2;
+    display:flex; flex-direction:column; position:relative;
+    background-image:radial-gradient(#e8d5ae 1px, transparent 1px);
+    background-size:22px 22px;
+  }
+  header {
+    background:linear-gradient(180deg,#8a5a2b,#6f4520); color:#ffe9bd;
+    padding:10px 14px 8px; display:flex; align-items:center; gap:8px;
+    box-shadow:0 2px 6px rgba(0,0,0,.35); z-index:5;
+  }
+  header .logo { font-size:20px; font-weight:900; letter-spacing:1px; text-shadow:0 2px 0 #4c2f12; }
+  header .logo small { font-size:11px; color:#ffd98a; }
+  header .stats { margin-left:auto; font-size:12px; text-align:right; line-height:1.5; }
+  header .stats b { color:#fff; font-size:14px; }
+  main { flex:1; overflow-y:auto; padding:12px 12px 84px; }
+  .view { display:none; }
+  .view.on { display:block; animation:fadein .18s ease; }
+  @keyframes fadein { from { opacity:0; transform:translateY(4px);} to { opacity:1; } }
+  h2 { font-size:17px; margin:2px 0 8px; color:#6f4520; }
+  p.desc { font-size:13px; color:#7a6748; margin-bottom:10px; line-height:1.6; }
+  /* 発掘グリッド */
+  #digGrid { display:grid; grid-template-columns:repeat(5,1fr); gap:7px; }
+  .tile {
+    aspect-ratio:1; border:none; border-radius:10px; font-size:26px; cursor:pointer;
+    background:linear-gradient(145deg,#a9743f,#8a5a2b); color:#fff;
+    box-shadow:0 3px 0 #5d3a17, inset 0 2px 3px rgba(255,255,255,.35);
+    transition:transform .06s;
+  }
+  .tile:active { transform:scale(.93); }
+  .tile.c1 { background:linear-gradient(145deg,#96682f,#75501f); }
+  .tile.open { background:#e5cf9f; box-shadow:inset 0 2px 6px rgba(90,60,20,.45); font-size:20px; }
+  .tile.fossil { background:radial-gradient(circle at 50% 40%,#fff3cf,#e8cf92); box-shadow:0 0 0 3px #ffb52e, inset 0 2px 6px rgba(90,60,20,.3); }
+  /* ボタン */
+  .btn {
+    display:inline-block; border:none; cursor:pointer; font-family:inherit; font-weight:800;
+    background:linear-gradient(180deg,#ffb52e,#f59e0b); color:#4c2f12;
+    padding:11px 18px; border-radius:999px; font-size:15px;
+    box-shadow:0 3px 0 #b45309; transition:transform .06s;
+  }
+  .btn:active { transform:translateY(2px); box-shadow:0 1px 0 #b45309; }
+  .btn.sub { background:linear-gradient(180deg,#fdf6e3,#efe0bd); box-shadow:0 3px 0 #c9ab72; color:#6f4520; }
+  .btn.teal { background:linear-gradient(180deg,#2dd4bf,#0d9488); color:#fff; box-shadow:0 3px 0 #0f766e; }
+  .btn:disabled { opacity:.45; pointer-events:none; }
+  .btn.big { width:100%; font-size:17px; padding:14px; }
+  /* カード */
+  .card {
+    background:#fffdf6; border:2px solid #e3cf9e; border-radius:14px; padding:10px;
+    box-shadow:0 2px 5px rgba(111,69,32,.12);
+  }
+  .creature { display:flex; gap:10px; align-items:center; }
+  .creature canvas { border-radius:10px; background:linear-gradient(180deg,#bfe8ff,#eafbe7); flex:none; }
+  .creature .nm { font-weight:900; font-size:16px; }
+  .creature .meta { font-size:12px; color:#7a6748; line-height:1.55; }
+  .chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:3px; }
+  .chip { font-size:11px; background:#f3e5c3; border-radius:999px; padding:2px 8px; color:#6f4520; font-weight:700; }
+  .chip.el { background:#ffe1a8; }
+  .list { display:flex; flex-direction:column; gap:9px; }
+  .sel { outline:3px solid #f59e0b; }
+  /* クリーニング */
+  #cleanWrap { position:relative; width:100%; max-width:340px; margin:0 auto; }
+  #cleanCv { width:100%; border-radius:14px; touch-action:none; background:#d9c08d; box-shadow:inset 0 0 0 3px #b98d4f; }
+  .gauge { height:16px; background:#e8dcc0; border-radius:999px; overflow:hidden; margin:10px 0; border:2px solid #cbb27f; }
+  .gauge > div { height:100%; width:0%; background:linear-gradient(90deg,#2dd4bf,#0d9488); transition:width .15s; }
+  /* バトル */
+  .bside { display:flex; flex-direction:column; gap:7px; margin-bottom:8px; }
+  .brow { display:flex; align-items:center; gap:8px; background:#fffdf6; border:2px solid #e3cf9e; border-radius:12px; padding:5px 8px; }
+  .brow.dead { opacity:.38; filter:grayscale(1); }
+  .brow.active { outline:3px solid #f59e0b; }
+  .brow canvas { border-radius:8px; background:linear-gradient(180deg,#ffe9c9,#fff6e0); flex:none; }
+  .brow .inf { flex:1; min-width:0; }
+  .brow .nm { font-weight:900; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .hp { height:9px; background:#eadfc6; border-radius:99px; overflow:hidden; margin-top:3px; }
+  .hp > div { height:100%; background:linear-gradient(90deg,#4ade80,#22c55e); transition:width .35s; }
+  .hp.low > div { background:linear-gradient(90deg,#f87171,#ef4444); }
+  .hp .hpnum { font-size:11px; }
+  .hpnum { font-size:11px; color:#7a6748; }
+  #blog {
+    background:#33241a; color:#ffe9bd; border-radius:12px; padding:10px 12px;
+    font-size:13px; line-height:1.65; height:132px; overflow-y:auto; margin:8px 0;
+  }
+  #blog .dmg { color:#fca5a5; } #blog .good { color:#86efac; } #blog .sys { color:#93c5fd; }
+  .cmds { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  /* タブバー */
+  nav {
+    position:absolute; left:0; right:0; bottom:0; display:flex; z-index:6;
+    background:#fffdf6; border-top:2px solid #e3cf9e; box-shadow:0 -3px 8px rgba(111,69,32,.15);
+  }
+  nav button {
+    flex:1; border:none; background:none; font-family:inherit; cursor:pointer;
+    padding:8px 0 10px; font-size:11px; font-weight:800; color:#a0865c;
+    display:flex; flex-direction:column; align-items:center; gap:1px;
+  }
+  nav button .ic { font-size:21px; }
+  nav button.on { color:#b45309; }
+  nav button.on .ic { transform:scale(1.15); }
+  /* モーダル */
+  #modal {
+    position:absolute; inset:0; background:rgba(43,28,10,.55); z-index:20;
+    display:none; align-items:center; justify-content:center; padding:18px;
+  }
+  #modal.on { display:flex; }
+  #modal .box {
+    background:#fffdf6; border-radius:18px; padding:18px 16px; width:100%; max-width:400px;
+    text-align:center; animation:pop .22s ease; max-height:88dvh; overflow-y:auto;
+  }
+  @keyframes pop { from { transform:scale(.85); opacity:0;} to { transform:scale(1); opacity:1;} }
+  #modal h3 { font-size:19px; margin-bottom:6px; color:#6f4520; }
+  #modal .box canvas { border-radius:12px; background:linear-gradient(180deg,#bfe8ff,#eafbe7); }
+  .grade { font-size:34px; font-weight:900; color:#f59e0b; text-shadow:0 2px 0 #b45309; }
+  .dexgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .dexcell { background:#fffdf6; border:2px solid #e3cf9e; border-radius:12px; padding:6px 4px; text-align:center; }
+  .dexcell canvas { border-radius:8px; background:linear-gradient(180deg,#bfe8ff,#eafbe7); }
+  .dexcell .nm { font-size:11px; font-weight:800; margin-top:3px; line-height:1.3; }
+  .dexcell .ct { font-size:10px; color:#a0865c; }
+  /* 発掘v2 */
+  .tools { display:flex; gap:7px; margin-bottom:9px; }
+  .tool {
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:0;
+    padding:8px 2px 7px; font-size:14px; border-radius:12px;
+  }
+  .tool small { font-size:10px; font-weight:600; color:#a0865c; }
+  .tool.on { outline:3px solid #f59e0b; background:linear-gradient(180deg,#fff3cf,#ffe9a8); }
+  .tile.cracked {
+    background:
+      linear-gradient(115deg, transparent 45%, rgba(43,25,5,.6) 46.5%, transparent 48.5%),
+      linear-gradient(30deg, transparent 62%, rgba(43,25,5,.5) 63.5%, transparent 65.5%),
+      linear-gradient(160deg, transparent 70%, rgba(43,25,5,.45) 71.5%, transparent 73.5%),
+      linear-gradient(145deg,#a9743f,#8a5a2b);
+  }
+  .tile.hard { background:linear-gradient(145deg,#7d6248,#5f4630); }
+  .tile.hard.cracked {
+    background:
+      linear-gradient(115deg, transparent 45%, rgba(20,10,0,.65) 46.5%, transparent 48.5%),
+      linear-gradient(30deg, transparent 62%, rgba(20,10,0,.55) 63.5%, transparent 65.5%),
+      linear-gradient(145deg,#7d6248,#5f4630);
+  }
+  .tile.ping { animation:ping 0.45s ease 3; }
+  @keyframes ping { 0%,100% { box-shadow:0 3px 0 #5d3a17; } 50% { box-shadow:0 0 0 6px #38bdf8, 0 3px 0 #5d3a17; transform:scale(1.07); } }
+  @keyframes shake { 0%,100% { transform:translateX(0); } 25% { transform:translateX(-4px); } 75% { transform:translateX(4px); } }
+  .shake { animation:shake .18s ease; }
+  .tile.treasure { background:radial-gradient(circle at 50% 40%,#e0f7ff,#a8dcf0); box-shadow:inset 0 2px 6px rgba(30,80,110,.4); }
+  .gauge.dmg > div { background:linear-gradient(90deg,#fbbf24,#ef4444); }
+  #timeGauge { background:linear-gradient(90deg,#f59e0b,#f97316); }
+  #cleanDmgGauge { background:linear-gradient(90deg,#4ade80,#22c55e); }
+  /* v4 演出 */
+  .tile { position:relative; }
+  .bit {
+    position:absolute; left:50%; top:50%; width:7px; height:7px; border-radius:2px;
+    pointer-events:none; z-index:4; animation:bitfly .5s ease-out forwards;
+  }
+  @keyframes bitfly { to { transform:translate(var(--dx), var(--dy)) rotate(160deg); opacity:0; } }
+  .brow { position:relative; }
+  .brow.hit { animation:hitshake .32s ease; }
+  @keyframes hitshake { 0%,100% { transform:translateX(0); } 20% { transform:translateX(-5px); background:#ffe1e1; } 45% { transform:translateX(4px); } 70% { transform:translateX(-2px); } }
+  .dmgpop {
+    position:absolute; right:10px; top:2px; font-weight:900; color:#dc2626; font-size:17px;
+    animation:dmgup .85s ease forwards; pointer-events:none; text-shadow:0 1px 0 #fff; z-index:3;
+  }
+  @keyframes dmgup { 0% { transform:translateY(5px); opacity:0; } 18% { opacity:1; } 100% { transform:translateY(-20px); opacity:0; } }
+  #cursorRing {
+    position:absolute; border:2px solid rgba(13,148,136,.8); border-radius:50%;
+    pointer-events:none; display:none; transform:translate(-50%,-50%); z-index:5;
+    box-shadow:0 0 0 1px rgba(255,255,255,.5) inset;
+  }
+  .card.gold { border-color:#f59e0b; box-shadow:0 0 0 2px #fbbf24, 0 2px 10px rgba(245,158,11,.4); }
+  .card.silver { border-color:#b8c2cc; box-shadow:0 0 0 1px #d5dde5, 0 2px 5px rgba(111,69,32,.12); }
+  #muteBtn { background:none; border:none; font-size:19px; cursor:pointer; padding:2px; }
+  /* v5 オリジナル演出 */
+  .mascotRow { display:flex; gap:9px; align-items:center; margin-bottom:9px; }
+  #mascotCv { flex:none; border-radius:50%; background:linear-gradient(180deg,#ffe9c9,#fff6e0); box-shadow:inset 0 0 0 2px #e3cf9e; }
+  .bubble {
+    position:relative; flex:1; background:#fff; border:2px solid #e3cf9e; border-radius:12px;
+    padding:7px 10px; font-size:12.5px; line-height:1.5; font-weight:700; color:#6f4520;
+    min-height:44px; display:flex; align-items:center;
+  }
+  .bubble::before { content:""; position:absolute; left:-8px; top:50%; margin-top:-6px; border:6px solid transparent; border-right-color:#e3cf9e; border-left:0; }
+  .progBox { flex:none; width:58px; text-align:center; }
+  .progBar { height:7px; background:#e8dcc0; border-radius:99px; overflow:hidden; margin-top:3px; }
+  #progFill { height:100%; width:0%; background:linear-gradient(90deg,#2dd4bf,#0d9488); transition:width .3s; }
+  .progPct { font-size:10px; color:#a0865c; font-weight:700; margin-top:2px; }
+  #progCvWrap canvas { border-radius:8px; background:linear-gradient(180deg,#bfe8ff,#eafbe7); }
+  #goodPop {
+    position:absolute; left:50%; top:15%; transform:translateX(-50%); font-size:30px; font-weight:900;
+    color:#f59e0b; text-shadow:0 2px 0 #fff, 0 4px 8px rgba(0,0,0,.25); opacity:0; pointer-events:none; z-index:6;
+  }
+  #goodPop.show { animation:goodpop .8s ease forwards; }
+  @keyframes goodpop { 0% { opacity:0; transform:translateX(-50%) scale(.6); } 25% { opacity:1; transform:translateX(-50%) scale(1.15); } 45% { transform:translateX(-50%) scale(1); } 100% { opacity:0; transform:translateX(-50%) translateY(-14px); } }
+  #cleanWrap {
+    background:linear-gradient(145deg,#9c6b32,#7c5223); padding:9px; border-radius:16px;
+    box-shadow:inset 0 2px 4px rgba(255,255,255,.35), inset 0 -3px 6px rgba(0,0,0,.3), 0 3px 8px rgba(111,69,32,.3);
+  }
+  /* v7 1画面に収める（ページスクロール禁止） */
+  main { flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; padding:10px 12px; }
+  nav { position:static; flex:none; }
+  .view.on { display:flex; flex-direction:column; height:100%; min-height:0; }
+  h2 { margin:0 0 4px; }
+  p.desc { margin-bottom:7px; }
+  #digArea { flex:1; min-height:0; display:flex; }
+  #digGrid { flex:1; grid-template-rows:repeat(6, 1fr); }
+  .tile { aspect-ratio:auto; height:auto; font-size:clamp(15px, 5.2vmin, 26px); }
+  #cleanWrap { width:min(340px, 100%, max(150px, calc(100dvh - 552px))); flex:none; }
+  #mascotCv { width:52px; height:52px; }
+  #v-clean .btn { flex:none; }
+  #v-clean .btn.big { padding:11px; }
+  #v-clean .tool { padding:6px 2px 5px; }
+  #cleanInfo { margin:4px 0 6px; }
+  @media (max-height: 720px) {
+    #v-clean .desc { display:none; }
+    #btnCleanRetry { display:none; }
+    #mascotCv { width:40px; height:40px; }
+    .bubble { min-height:0; font-size:11.5px; padding:5px 8px; }
+    .progBox { width:46px; }
+  }
+  #btnCleanRetry { padding:8px; font-size:13px; margin-top:6px; }
+  #cleanCv { width:100%; height:auto; display:block; }
+  #battleArea { display:flex; flex-direction:column; flex:1; min-height:0; }
+  #blog { flex:1; min-height:54px; height:auto; }
+  .list { overflow-y:auto; min-height:0; flex:1; padding-bottom:4px; }
+  .dexgrid { overflow-y:auto; min-height:0; flex:1; align-content:start; padding-bottom:4px; }
+  header .logo { white-space:nowrap; font-size:17px; }
+  header .stats { white-space:nowrap; }
+  /* v8 クリーニング集中モード */
+  #app.focus header, #app.focus nav { display:none; }
+  #app.focus main { padding:8px 10px; }
+  #app.focus #v-clean h2, #app.focus #v-clean .desc { display:none; }
+  #app.focus #cleanWrap { max-width:372px; width:min(372px, 100%, calc(100dvh - 292px)); }
+  #app.focus #mascotCv { width:44px; height:44px; }
+  #app.focus #btnCleanRetry { display:block; }
+  /* v9 デザイン刷新 */
+  #app { background:linear-gradient(180deg,#faF0da,#f3e2bd); }
+  #app::after {
+    content:""; position:absolute; inset:0; pointer-events:none; z-index:50;
+    background:radial-gradient(ellipse at 50% 42%, transparent 58%, rgba(90,60,20,.13));
+  }
+  header {
+    background:linear-gradient(180deg,#9a652f,#7a4e21);
+    border-bottom:3px solid #5d3a17;
+    box-shadow:0 3px 8px rgba(60,35,5,.35), inset 0 1px 0 rgba(255,255,255,.25);
+  }
+  .logoBadge {
+    display:inline-block; background:linear-gradient(180deg,#ffc44d,#f59e0b);
+    border-radius:9px; padding:0 5px; margin-right:2px;
+    box-shadow:0 2px 0 #b45309, inset 0 1px 0 rgba(255,255,255,.6);
+  }
+  h2 { text-shadow:0 1px 0 rgba(255,255,255,.7); letter-spacing:.5px; }
+  #digArea {
+    background:linear-gradient(180deg, rgba(169,116,63,.14), rgba(169,116,63,.22));
+    border-radius:14px; padding:6px; box-shadow:inset 0 2px 6px rgba(90,60,20,.18);
+  }
+  .tile {
+    border-radius:12px;
+    background:
+      radial-gradient(circle at 30% 22%, rgba(255,255,255,.30), transparent 45%),
+      repeating-linear-gradient(178deg, transparent 0 9px, rgba(70,42,12,.12) 9px 10px),
+      linear-gradient(160deg,#b3814a,#96682f);
+    box-shadow:0 3px 0 #5d3a17, inset 0 2px 3px rgba(255,255,255,.35), inset 0 -6px 9px rgba(70,42,12,.35);
+  }
+  .tile.hard {
+    background:
+      radial-gradient(circle at 30% 22%, rgba(255,255,255,.18), transparent 45%),
+      repeating-linear-gradient(178deg, transparent 0 8px, rgba(20,12,4,.16) 8px 9px),
+      linear-gradient(160deg,#77644c,#57432c);
+  }
+  .tile.cracked {
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cpath d='M10 2 L24 20 L17 31 L32 46 M24 20 L40 25 M32 46 L29 58' stroke='rgba(43,25,5,.5)' stroke-width='2.2' fill='none'/%3E%3C/svg%3E"),
+      radial-gradient(circle at 30% 22%, rgba(255,255,255,.26), transparent 45%),
+      repeating-linear-gradient(178deg, transparent 0 9px, rgba(70,42,12,.12) 9px 10px),
+      linear-gradient(160deg,#ad7a42,#8a5a2b);
+    background-size:cover, auto, auto, auto;
+  }
+  .tile.hard.cracked {
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cpath d='M10 2 L24 20 L17 31 L32 46 M24 20 L40 25 M32 46 L29 58' stroke='rgba(15,8,2,.6)' stroke-width='2.2' fill='none'/%3E%3C/svg%3E"),
+      radial-gradient(circle at 30% 22%, rgba(255,255,255,.15), transparent 45%),
+      linear-gradient(160deg,#6f5b45,#4e3a24);
+    background-size:cover, auto, auto;
+  }
+  .tile.open {
+    background:radial-gradient(ellipse at 50% 42%, #f0deb0, #dec48f);
+    box-shadow:inset 0 3px 9px rgba(90,60,20,.5), inset 0 -2px 4px rgba(255,255,255,.4);
+  }
+  .tile.fossil {
+    background:radial-gradient(circle at 50% 38%, #fff6d8, #f3d98b);
+    animation:fossilGlow 1.6s ease-in-out infinite;
+  }
+  @keyframes fossilGlow {
+    0%,100% { box-shadow:0 0 0 3px #ffb52e, 0 0 12px rgba(255,181,46,.55), inset 0 2px 6px rgba(90,60,20,.3); }
+    50% { box-shadow:0 0 0 3px #ffb52e, 0 0 24px rgba(255,181,46,.95), inset 0 2px 6px rgba(90,60,20,.3); }
+  }
+  .tile.treasure { animation:twinkle 1.3s ease-in-out infinite; }
+  @keyframes twinkle { 0%,100% { filter:brightness(1); } 50% { filter:brightness(1.22); } }
+  .btn { box-shadow:0 3px 0 #b45309, inset 0 1px 0 rgba(255,255,255,.55); }
+  .btn.teal { box-shadow:0 3px 0 #0f766e, inset 0 1px 0 rgba(255,255,255,.45); }
+  .btn.sub { box-shadow:0 3px 0 #c9ab72, inset 0 1px 0 rgba(255,255,255,.7); }
+  .tool { box-shadow:0 2px 0 #c9ab72, inset 0 1px 0 #fff; }
+  nav button { margin:4px 3px; border-radius:12px; }
+  nav button.on { background:linear-gradient(180deg,#fff3cf,#ffe9a8); box-shadow:inset 0 0 0 2px #f5c04e; }
+  .card {
+    background:linear-gradient(180deg,#fffef9,#fdf6e0);
+    box-shadow:0 3px 8px rgba(111,69,32,.13), inset 0 1px 0 #fff;
+    border-radius:16px;
+  }
+  .creature canvas { box-shadow:inset 0 0 0 2px rgba(255,255,255,.65), 0 2px 5px rgba(90,60,20,.2); }
+  .sbar { display:flex; align-items:center; gap:5px; font-size:10.5px; margin-top:2px; }
+  .sbar span { width:45px; color:#a0865c; font-weight:700; flex:none; white-space:nowrap; font-size:10px; }
+  header .stats { flex:none; font-size:11px; line-height:1.45; }
+  .brow { padding:4px 7px; gap:7px; }
+  .brow canvas { width:46px !important; height:46px !important; }
+  .bside { gap:5px; }
+  #battleArea .bside { padding:4px; }
+  #blog { min-height:24px; }
+  .sbar b { width:24px; text-align:right; flex:none; color:#6f4520; }
+  .strack { flex:1; height:6px; background:#eadfc6; border-radius:99px; overflow:hidden; box-shadow:inset 0 1px 2px rgba(90,60,20,.25); }
+  .strack > div { height:100%; border-radius:99px; background-image:linear-gradient(180deg, rgba(255,255,255,.5), transparent 60%); }
+  .gauge { box-shadow:inset 0 1px 3px rgba(90,60,20,.35); }
+  .gauge > div { background-image:linear-gradient(180deg, rgba(255,255,255,.45), transparent 55%); }
+  #battleArea .bside { background:linear-gradient(180deg, rgba(168,216,234,.30), rgba(214,240,205,.30)); border-radius:14px; padding:6px; }
+  #battleArea .bside:first-child { background:linear-gradient(180deg, rgba(244,194,160,.35), rgba(250,230,200,.30)); }
+  .brow { box-shadow:0 2px 4px rgba(111,69,32,.10); }
+  .hp > div { background-image:linear-gradient(180deg, rgba(255,255,255,.5), transparent 55%), linear-gradient(90deg,#4ade80,#22c55e); }
+  .hp.low > div { background-image:linear-gradient(180deg, rgba(255,255,255,.5), transparent 55%), linear-gradient(90deg,#f87171,#ef4444); }
+  #modal { backdrop-filter:blur(2px); }
+  #modal .box { border:3px solid #e7d29c; box-shadow:0 14px 34px rgba(43,28,10,.45); }
+  .bubble { box-shadow:0 2px 5px rgba(111,69,32,.12); }
+  #cleanWrap {
+    background:
+      radial-gradient(circle 5px at 13px 13px, #54370f 3.5px, #d8b878 4.5px, transparent 5.5px),
+      radial-gradient(circle 5px at calc(100% - 13px) 13px, #54370f 3.5px, #d8b878 4.5px, transparent 5.5px),
+      radial-gradient(circle 5px at 13px calc(100% - 13px), #54370f 3.5px, #d8b878 4.5px, transparent 5.5px),
+      radial-gradient(circle 5px at calc(100% - 13px) calc(100% - 13px), #54370f 3.5px, #d8b878 4.5px, transparent 5.5px),
+      linear-gradient(145deg,#a06c33,#7c5223);
+  }
+  @media (max-height:720px) {
+    #v-battle h2 { display:none; }
+    #v-battle .brow { padding:3px 6px; gap:6px; }
+    #v-battle .brow canvas { width:36px !important; height:36px !important; }
+    #v-battle .brow .nm { font-size:12.5px; }
+    #v-battle .brow .hpnum { font-size:10.5px; }
+    #v-battle .vs { font-size:12.5px; margin:1px 0; }
+    #v-battle #blog { min-height:20px; font-size:12.5px; padding:6px 8px; }
+    #v-battle .cmds { grid-template-columns:repeat(4,1fr); gap:5px; }
+    #v-battle .cmds .btn { padding:8px 2px; font-size:12px; }
+    #v-battle #battleArea > .btn { padding:6px; font-size:13px; margin-top:3px !important; }
+    #v-battle .bside { gap:4px; padding:3px; }
+    #v-battle .brow .hp { margin:2px 0 1px; }
+  }
+  .cleanBtns { display:flex; gap:8px; }
+  #v-clean .cleanBtns .btn { flex:1 1 0%; }
+  .cleanBtns #btnCleanRetry { margin-top:0; }
+  .vs { text-align:center; font-weight:900; color:#b45309; margin:2px 0; }
+  /* v10 新仕様 */
+  .rockIc { font-size:40px; line-height:1; flex:none; width:56px; text-align:center; }
+  .rockCard .autoRow { display:flex; gap:5px; margin-top:7px; flex-wrap:wrap; }
+  .rockCard .autoRow .btn { flex:1; padding:7px 2px; font-size:11.5px; white-space:nowrap; }
+  .partRow { display:flex; align-items:center; gap:6px; padding:7px 9px; }
+  .partRow .pchip { font-size:10.5px; padding:2px 6px; border-radius:99px; background:#eadfc6; color:#a0865c; font-weight:700; white-space:nowrap; }
+  .partRow .pchip.got { background:#d9f99d; color:#4d7c0f; }
+  .partRow .pchip.gS { background:#fde68a; color:#92400e; }
+  .expbar { height:5px; background:#eadfc6; border-radius:99px; overflow:hidden; margin-top:3px; }
+  .expbar > div { height:100%; background:linear-gradient(90deg,#38bdf8,#818cf8); }
+  .lockRow { display:flex; gap:5px; flex-wrap:wrap; margin-top:8px; }
+  .lockRow .btn { flex:1; padding:7px 2px; font-size:11.5px; white-space:nowrap; }
+  .lockRow .btn.on { background:linear-gradient(180deg,#fbbf24,#f59e0b); color:#fff; box-shadow:0 3px 0 #b45309; }
+  #v-rock.on { display:block; overflow-y:auto; }
+  #v-rock .list { flex:none; overflow:visible; }
+  #hdrStats { font-size:10.5px; white-space:nowrap; line-height:1.5; }
+  header { overflow:hidden; }
+  header .logo { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+  #muteBtn { flex:none; }
+  .note { font-size:12px; color:#a0865c; text-align:center; margin-top:8px; line-height:1.6; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo"><span class="logoBadge">🦴</span> カセキ交配バトル <small>試作v11</small></div>
+    <button id="muteBtn" title="効果音オン/オフ">🔊</button>
+    <div class="stats" id="hdrStats"><span id="stRank">見習い</span><br>⚡<b id="stStamina">30</b> てもち<b id="stBox">0</b> ずかん<b id="stDex">0</b></div>
+  </header>
+  <main id="main">
+    <!-- 研究所（ホーム） -->
+    <section class="view on" id="v-home">
+      <h2>🔬 カセキ研究所</h2>
+      <div class="mascotRow">
+        <canvas id="mascotCv2" width="64" height="64"></canvas>
+        <div class="bubble">ようこそ研究所へ！岩を手に入れて、骨を取り出して、復活させるのが仕事だよ。まずは岩ガチャから！</div>
+      </div>
+      <div class="card" style="display:block;">
+        <div class="nm">📊 研究員ステータス</div>
+        <div class="meta" id="homeStats"></div>
+      </div>
+      <button class="btn big" id="btnGacha" style="margin-top:12px;">🎰 岩ガチャを引く（試作：無料）</button>
+      <button class="btn teal big" id="btnEventRock" style="margin-top:8px;">🎁 イベント岩をもらう（試作）</button>
+      <p class="note">岩は「岩・部位」タブにストックされるよ。レアな岩ほど中身もレア、でも岩は硬い！<br>岩を開けるにはスタミナ5を消費。時間で回復するよ。</p>
+    </section>
+    <!-- 岩・部位 -->
+    <section class="view" id="v-rock">
+      <h2>🪨 岩ストックと部位</h2>
+      <p class="desc">岩をタップで手動クリーニング、または自動クリーニング（3段階）で開けよう。部位が5つ揃った種は復活できる！</p>
+      <div class="list" id="rockList"></div>
+      <h2 style="margin-top:14px;">🦴 部位コレクション</h2>
+      <div id="partList"></div>
+    </section>
+        <!-- クリーニング -->
+    <section class="view" id="v-clean">
+      <h2>🖌️ 岩割りクリーニング</h2>
+      <p class="desc">制限時間なし。X線で形を覚え、道具5種を使い分けて骨を取り出そう。骨を叩くと評価ダウン！</p>
+      <div class="mascotRow">
+        <canvas id="mascotCv" width="64" height="64"></canvas>
+        <div class="bubble" id="mascotSay">まずはX線で形を覚えるのがコツ！</div>
+        <div class="progBox"><span id="progCvWrap"></span><div class="progBar"><div id="progFill"></div></div><div class="progPct" id="progPct">発掘率 0%</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <div style="font-weight:900;font-size:15px;white-space:nowrap;" id="cleanRockInfo">🪨 岩</div>
+        <div class="gauge" style="flex:1;margin:0;"><div id="timeGauge"></div></div>
+        <div style="font-weight:900;white-space:nowrap;">スコア <span id="cleanScore">0</span></div>
+      </div>
+      <div class="tools">
+        <button class="btn sub tool" id="ctXray">🩻 X線<small>残り <span id="xrayN">2</span> 回</small></button>
+        <button class="btn sub tool on" id="ctHammer">🔨 ハンマー<small>広く割る</small></button>
+        <button class="btn sub tool" id="ctDrillB">🌀 ドリル大<small>丸く深く削る</small></button>
+        <button class="btn sub tool" id="ctDrill">🌀 ドリル小<small>細かく削る</small></button>
+        <button class="btn sub tool" id="ctAir">💨 エア<small>粉を飛ばす</small></button>
+      </div>
+      <div id="cleanWrap"><canvas id="cleanCv" width="340" height="340"></canvas><div id="cursorRing"></div><div id="goodPop"></div></div>
+      <div class="gauge dmg"><div id="cleanDmgGauge"></div></div>
+      <p class="note" id="cleanInfo">化石ダメージ 0%</p>
+      <div class="cleanBtns">
+        <button class="btn teal big" id="btnFinish">✨ かんせい！</button>
+        <button class="btn sub big" id="btnCleanRetry">🔁 やりなおす</button>
+      </div>
+    </section>
+    <!-- てもち -->
+    <section class="view" id="v-box">
+      <h2>🎒 てもちの生物</h2>
+      <p class="desc">バトルには先頭の3体が自動で出るよ。タップで交配に選ぶこともできる。</p>
+      <div class="list" id="boxList"></div>
+    </section>
+    <!-- 交配 -->
+    <section class="view" id="v-breed">
+      <h2>🧬 こうはい</h2>
+      <p class="desc">2体選ぶと、遺伝子を受け継いだ子どもが生まれる。突然変異でレアな姿になることも…！</p>
+      <div class="list" id="breedList"></div>
+      <div id="breedLock"></div>
+      <button class="btn big" id="btnBreed" style="margin-top:12px;" disabled>💞 交配する（2体えらんでね）</button>
+    </section>
+    <!-- バトル -->
+    <section class="view" id="v-battle">
+      <h2>⚔️ バトル</h2>
+      <div id="battleArea">
+        <p class="desc">野生の生物チームと3対3のターン制バトル。「さくせん」で自動、「コマンド」で自分で指示できる。</p>
+        <button class="btn big" id="btnBattleStart">⚔️ バトル開始！</button>
+        <p class="note">勝つと経験値とランクポイントが手に入る。<br>てもちが0体だと戦えないよ。</p>
+      </div>
+    </section>
+    <!-- 図鑑 -->
+    <section class="view" id="v-dex">
+      <h2>📖 ずかん</h2>
+      <p class="desc">出会った姿（遺伝子の組み合わせ）を記録。コンプリートを目指そう！</p>
+      <div class="dexgrid" id="dexGrid"></div>
+      <p class="note" id="dexEmpty">まだ記録がない。発掘して復活させよう！</p>
+    </section>
+  </main>
+  <nav id="tabbar">
+    <button data-v="home" class="on"><span class="ic">🔬</span>研究所</button>
+    <button data-v="rock"><span class="ic">🪨</span>岩・部位</button>
+    <button data-v="box"><span class="ic">🎒</span>てもち</button>
+    <button data-v="breed"><span class="ic">🧬</span>こうはい</button>
+    <button data-v="battle"><span class="ic">⚔️</span>バトル</button>
+    <button data-v="dex"><span class="ic">📖</span>ずかん</button>
+  </nav>
+  <div id="modal"><div class="box" id="modalBox"></div></div>
+</div>
+<script>
+"use strict";
+/* ============ データ定義 ============ */
+// 遺伝子スロット：body(体型) head(頭) horn(角) wing(翼) tail(尾) legs(脚) pattern(模様) hue(色相) size(大きさ)
+const PARTNAME = {
+  body:  ["まる", "なが", "たて", "がっちり"],
+  head:  ["まる頭", "しかく頭", "とんがり頭"],
+  horn:  ["なし", "1本角", "2本角", "王冠角"],
+  wing:  ["なし", "小さい翼", "大きな翼"],
+  tail:  ["なし", "長い尾", "くるりん尾"],
+  legs:  ["短い脚", "長い脚", "浮遊"],
+  pattern: ["無地", "しま模様", "水玉模様", "グラデ"],
+};
+const ELNAME = ["ほのお", "みず", "かみなり", "いわ", "かぜ", "つち"];
+// 属性相性：攻撃側 -> {強い相手, 弱い相手}
+const ELCHART = { 0:{win:5, lose:1}, 1:{win:0, lose:2}, 2:{win:1, lose:3}, 3:{win:2, lose:4}, 4:{win:3, lose:5}, 5:{win:4, lose:0} };
+const SKILLS = [
+  { id:"bite",  nm:"かみつく",     pw:1.0, el:-1 },
+  { id:"tackle",nm:"たいあたり",   pw:1.1, el:-1 },
+  { id:"fire",  nm:"かえんブレス", pw:1.35, el:0 },
+  { id:"aqua",  nm:"みずてっぽう", pw:1.35, el:1 },
+  { id:"spark", nm:"でんげき",     pw:1.35, el:2 },
+  { id:"rock",  nm:"いわくだき",   pw:1.35, el:3 },
+  { id:"wind",  nm:"かぜのつめ",   pw:1.35, el:4 },
+  { id:"quake", nm:"じしん",       pw:1.35, el:5 },
+];
+const skillById = id => SKILLS.find(s => s.id === id);
+// 種（化石から復活する基本形）。genesが基本遺伝子、biasがステータス傾向
+const SPECIES = [
+  { nm:"マルノドン",   el:5, genes:{body:0,head:0,horn:0,wing:0,tail:0,legs:0,pattern:0,hue:35, size:1.0}, bias:{hp:1.1,atk:0.9,def:1.1,spd:0.9}, skills:["bite","quake"] },
+  { nm:"ツノサウルス", el:3, genes:{body:3,head:0,horn:2,wing:0,tail:1,legs:1,pattern:0,hue:95, size:1.15}, bias:{hp:1.0,atk:1.25,def:1.0,spd:0.95}, skills:["tackle","rock"] },
+  { nm:"ハネプテラ",   el:4, genes:{body:1,head:2,horn:0,wing:2,tail:1,legs:0,pattern:3,hue:200,size:0.85}, bias:{hp:0.85,atk:1.0,def:0.8,spd:1.35}, skills:["wind","bite"] },
+  { nm:"ナガリュー",   el:1, genes:{body:1,head:0,horn:1,wing:0,tail:1,legs:2,pattern:1,hue:215,size:1.0}, bias:{hp:0.95,atk:1.1,def:0.9,spd:1.1}, skills:["aqua","bite"] },
+  { nm:"ガチゴーレム", el:3, genes:{body:3,head:1,horn:0,wing:0,tail:0,legs:0,pattern:0,hue:30, size:1.25}, bias:{hp:1.25,atk:1.05,def:1.4,spd:0.6}, skills:["rock","tackle"] },
+  { nm:"プニスライモ", el:1, genes:{body:0,head:0,horn:0,wing:0,tail:0,legs:2,pattern:2,hue:160,size:0.8}, bias:{hp:1.0,atk:0.85,def:0.95,spd:1.05}, skills:["aqua","tackle"] },
+  { nm:"トゲアンキロ", el:5, genes:{body:3,head:0,horn:2,wing:0,tail:2,legs:0,pattern:1,hue:55, size:1.05}, bias:{hp:1.1,atk:1.0,def:1.35,spd:0.7}, skills:["quake","rock"] },
+  { nm:"キングレックス", el:0, genes:{body:2,head:0,horn:3,wing:0,tail:1,legs:1,pattern:3,hue:15, size:1.3}, bias:{hp:1.1,atk:1.35,def:1.0,spd:1.0}, skills:["fire","bite"] },
+  { nm:"デンキネズミ", el:2, genes:{body:0,head:2,horn:0,wing:0,tail:2,legs:0,pattern:1,hue:50, size:0.7}, bias:{hp:0.8,atk:1.05,def:0.75,spd:1.45}, skills:["spark","tackle"] },
+  { nm:"ヒカリクラゲ", el:2, genes:{body:2,head:0,horn:0,wing:1,tail:0,legs:2,pattern:2,hue:275,size:0.9}, bias:{hp:0.9,atk:1.15,def:0.85,spd:1.0}, skills:["spark","aqua"] },
+  { nm:"ドラゴンレックス", el:0, recipe:true, genes:{body:2,head:0,horn:3,wing:2,tail:1,legs:1,pattern:3,hue:280,size:1.35}, bias:{hp:1.15,atk:1.45,def:1.0,spd:1.15}, skills:["fire","wind"] },
+  { nm:"マグナゴレム", el:2, recipe:true, genes:{body:3,head:1,horn:1,wing:0,tail:0,legs:0,pattern:1,hue:45,size:1.3}, bias:{hp:1.3,atk:1.3,def:1.35,spd:0.7}, skills:["spark","rock"] },
+];
+// レシピ配合（種名の組み合わせ -> 新種）
+const RECIPES = { "キングレックス|ハネプテラ": "ドラゴンレックス", "ガチゴーレム|デンキネズミ": "マグナゴレム" };
+const PARTS = ["あたま", "どうたい", "うで", "あし", "しっぽ"];
+const GRADE_MULT = { S:1.30, A:1.15, B:1.05, C:1.00 };
+const GRADE_JP = { S:"完璧", A:"きれい", B:"ふつう", C:"キズあり" };
+
+/* ============ 状態 ============ */
+let S = { box: [], dex: {}, sel: [], uid: 1, mute: false, rocks: [], parts: {}, stamina: { cur: 30, last: Date.now() }, rankPt: 0, tickets: 3 };
+try {
+  const raw = localStorage.getItem("kaseki-proto-v11");
+  if (raw) S = Object.assign(S, JSON.parse(raw));
+} catch (e) {}
+if (!Array.isArray(S.rocks)) S.rocks = [];
+if (!S.parts || typeof S.parts !== "object") S.parts = {};
+if (!S.stamina) S.stamina = { cur: 30, last: Date.now() };
+if (typeof S.rankPt !== "number") S.rankPt = 0;
+if (typeof S.tickets !== "number") S.tickets = 3;
+function save() {
+  try { localStorage.setItem("kaseki-proto-v11", JSON.stringify(S)); } catch (e) {}
+  document.getElementById("stBox").textContent = S.box.length;
+  document.getElementById("stDex").textContent = Object.keys(S.dex).length;
+  if (typeof renderHeader === "function") renderHeader();
+}
+const rnd = (a, b) => a + Math.random() * (b - a);
+const ri = n => Math.floor(Math.random() * n);
+const pick = arr => arr[ri(arr.length)];
+
+/* ============ 効果音（WebAudio合成） ============ */
+let AC = null;
+function se(kind) {
+  if (S.mute) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === "suspended") AC.resume();
+    const t = AC.currentTime;
+    const tone = (f0, f1, dur, type, vol, delay) => {
+      const o = AC.createOscillator(), g = AC.createGain();
+      o.type = type || "sine";
+      o.frequency.setValueAtTime(f0, t + (delay || 0));
+      o.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t + (delay || 0) + dur);
+      g.gain.setValueAtTime(vol || 0.12, t + (delay || 0));
+      g.gain.exponentialRampToValueAtTime(0.001, t + (delay || 0) + dur);
+      o.connect(g).connect(AC.destination);
+      o.start(t + (delay || 0)); o.stop(t + (delay || 0) + dur + 0.02);
+    };
+    const noise = (dur, vol, delay, freq) => {
+      const len = Math.floor(AC.sampleRate * dur);
+      const buf = AC.createBuffer(1, len, AC.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      const src = AC.createBufferSource(); src.buffer = buf;
+      const f = AC.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = freq || 900;
+      const g = AC.createGain(); g.gain.value = vol || 0.15;
+      src.connect(f).connect(g).connect(AC.destination);
+      src.start(t + (delay || 0));
+    };
+    switch (kind) {
+      case "tap": tone(170, 90, 0.07, "square", 0.06); break;
+      case "break": noise(0.16, 0.2, 0, 700); tone(120, 50, 0.14, "triangle", 0.14); break;
+      case "fossil": tone(880, 880, 0.09, "sine", 0.1); tone(1318, 1318, 0.14, "sine", 0.1, 0.08); break;
+      case "hammer": noise(0.1, 0.22, 0, 500); tone(90, 45, 0.1, "sine", 0.18); break;
+      case "hit": tone(200, 60, 0.13, "sawtooth", 0.1); noise(0.08, 0.1, 0, 1200); break;
+      case "sparkle": [660, 880, 1108].forEach((f, i) => tone(f, f, 0.12, "sine", 0.09, i * 0.07)); break;
+      case "win": [523, 659, 784, 1046].forEach((f, i) => tone(f, f, 0.16, "triangle", 0.11, i * 0.09)); break;
+    }
+  } catch (e) {}
+}
+
+/* ============ 生物生成 ============ */
+function statsFromGenes(g, bias, mult) {
+  const partBonus = {
+    hp:  (g.body === 3 ? 14 : g.body === 0 ? 8 : 4) + g.size * 8,
+    atk: (g.horn >= 2 ? 9 : g.horn === 1 ? 5 : 0) + (g.body === 2 ? 4 : 0),
+    def: (g.body === 3 ? 9 : 0) + (g.pattern === 1 ? 3 : 0),
+    spd: (g.wing === 2 ? 10 : g.wing === 1 ? 5 : 0) + (g.legs === 1 ? 4 : 0) - (g.size - 1) * 8,
+  };
+  const base = { hp: 46, atk: 15, def: 13, spd: 12 };
+  const st = {};
+  for (const k of ["hp", "atk", "def", "spd"]) {
+    st[k] = Math.max(3, Math.round((base[k] + partBonus[k]) * (bias ? bias[k] : 1) * mult * rnd(0.92, 1.08)));
+  }
+  return st;
+}
+function nameFromGenes(g) {
+  const pre = g.horn === 3 ? "キング" : g.horn >= 1 ? "ツノ" : g.wing >= 1 ? "ハネ" : g.tail === 2 ? "クル" : g.pattern === 2 ? "プニ" : g.body === 1 ? "ナガ" : "マル";
+  const suf = g.body === 3 ? "ゴン" : g.body === 1 ? "リュー" : g.body === 2 ? "ドン" : "マル";
+  const col = g.hue < 25 || g.hue >= 340 ? "アカ" : g.hue < 70 ? "キイ" : g.hue < 160 ? "ミド" : g.hue < 250 ? "アオ" : "ムラ";
+  return pre + col + suf;
+}
+function makeCreature(genes, el, skills, origin) {
+  const st = statsFromGenes(genes, null, origin.mult || 1);
+  const c = {
+    id: S.uid++, genes: Object.assign({}, genes), el,
+    skills: skills.slice(0, 4), stats: st, maxhp: st.hp,
+    name: origin.name || nameFromGenes(genes),
+    grade: origin.grade || null, origin: origin.kind,
+    lv: 1, exp: 0, parts: origin.parts || null, spName: origin.spName || null,
+  };
+  return c;
+}
+function gradeMul(g) { return g ? GRADE_MULT[g] : 1.0; }
+function effStats(c) {
+  const st = Object.assign({}, c.stats);
+  if (c.parts) {
+    st.hp = Math.round(st.hp * gradeMul(c.parts[1]));
+    st.atk = Math.round(st.atk * gradeMul(c.parts[2]));
+    st.def = Math.round(st.def * gradeMul(c.parts[3]));
+    st.spd = Math.round(st.spd * (gradeMul(c.parts[0]) + gradeMul(c.parts[4])) / 2);
+  }
+  const lvm = 1 + 0.05 * ((c.lv || 1) - 1);
+  for (const k of ["hp", "atk", "def", "spd"]) st[k] = Math.max(3, Math.round(st[k] * lvm));
+  return st;
+}
+function gainExp(c, n) {
+  if (!c) return 0;
+  c.exp = (c.exp || 0) + n;
+  let ups = 0;
+  while (c.exp >= (c.lv || 1) * 50) { c.exp -= (c.lv || 1) * 50; c.lv = (c.lv || 1) + 1; ups++; }
+  if (ups) c.maxhp = effStats(c).hp;
+  return ups;
+}
+function dexKey(g) { return [g.body, g.head, g.horn, g.wing, g.tail, g.legs, g.pattern, Math.round(g.hue / 30)].join("-"); }
+function registerDex(c) {
+  const k = dexKey(c.genes);
+  if (!S.dex[k]) S.dex[k] = { genes: Object.assign({}, c.genes), name: c.name, count: 0, el: c.el };
+  S.dex[k].count++;
+}
+function addCreature(c) { S.box.push(c); registerDex(c); save(); }
+
+/* 化石から復活 */
+function reviveFromFossil(f) {
+  const sp = SPECIES[f.sp];
+  const g = Object.assign({}, sp.genes);
+  // 部位ボーナス：あたま化石は角が育ちやすい等
+  if (f.part === 0 && Math.random() < 0.5) g.horn = Math.min(3, g.horn + 1);
+  if (f.part === 4 && Math.random() < 0.5) g.tail = Math.min(2, g.tail + 1);
+  if (f.part === 3 && Math.random() < 0.5) g.legs = Math.min(2, g.legs + 1);
+  // クリーニングの出来が良いほど突然変異（レア色など）
+  const mutP = f.grade === "S" ? 0.30 : f.grade === "A" ? 0.18 : 0.08;
+  if (Math.random() < mutP) g.hue = (g.hue + pick([60, 120, 180, 300])) % 360;
+  if (Math.random() < mutP) g.pattern = ri(4);
+  const mult = GRADE_MULT[f.grade];
+  const c = makeCreature(g, sp.el, sp.skills, { kind: "復活", grade: f.grade, mult, name: sp.nm });
+  c.stats = statsFromGenes(g, sp.bias, mult); c.maxhp = c.stats.hp;
+  return c;
+}
+/* 交配：各遺伝子を両親から継承＋突然変異、特技は引き継ぎ */
+function breedCreatures(a, b) {
+  const g = {};
+  const slots = ["body", "head", "horn", "wing", "tail", "legs", "pattern"];
+  for (const s of slots) {
+    g[s] = Math.random() < 0.5 ? a.genes[s] : b.genes[s];
+    if (Math.random() < 0.07) g[s] = ri(PARTNAME[s].length);
+  }
+  g.hue = Math.random() < 0.5 ? a.genes.hue : b.genes.hue;
+  if (Math.random() < 0.10) g.hue = (g.hue + pick([40, 90, 160, 220])) % 360;
+  g.size = Math.round(((a.genes.size + b.genes.size) / 2 + rnd(-0.08, 0.08)) * 100) / 100;
+  const el = Math.random() < 0.5 ? a.el : b.el;
+  const pool = [...new Set([...a.skills, ...b.skills])];
+  const sk = [];
+  while (sk.length < Math.min(4, pool.length) && pool.length) sk.push(pool.splice(ri(pool.length), 1)[0]);
+  if (!sk.length) sk.push("bite");
+  // 部位グレード継承：指定部位は選んだ親から確実に、他はランダム
+  let parts = null;
+  if (a.parts || b.parts) {
+    parts = {};
+    for (let pi = 0; pi < 5; pi++) {
+      const src = (typeof BL !== "undefined" && BL.part === pi) ? [a, b][BL.parent] : (Math.random() < 0.5 ? a : b);
+      const alt = src === a ? b : a;
+      parts[pi] = (src.parts && src.parts[pi]) || (alt.parts && alt.parts[pi]) || null;
+    }
+  }
+  // レシピ配合
+  const key1 = (a.spName || a.name) + "|" + (b.spName || b.name);
+  const key2 = (b.spName || b.name) + "|" + (a.spName || a.name);
+  const recipeName = RECIPES[key1] || RECIPES[key2];
+  if (recipeName) {
+    const rsp = SPECIES.find(x => x.nm === recipeName);
+    const rg = Object.assign({}, rsp.genes);
+    if (Math.random() < 0.15) rg.hue = (rg.hue + pick([60, 120, 240])) % 360;
+    const c = makeCreature(rg, rsp.el, [...new Set([...rsp.skills, ...sk])].slice(0, 4), { kind: "交配", name: rsp.nm, spName: rsp.nm, parts });
+    c.stats = statsFromGenes(rg, rsp.bias, 1);
+    c.maxhp = effStats(c).hp;
+    return c;
+  }
+  const c = makeCreature(g, el, sk, { kind: "交配", parts });
+  c.maxhp = effStats(c).hp;
+  return c;
+}
+
+/* ============ 描画（遺伝子→見た目） ============ */
+function drawCreature(cv, g, size, fossil) {
+  const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2 + H * 0.04;
+  const u = (W / 200) * (g.size || 1); // 基本単位
+  const hue = g.hue;
+  const bodyC = fossil ? "#f2e7c8" : `hsl(${hue},62%,52%)`;
+  const darkC = fossil ? "#c9ad7e" : `hsl(${hue},60%,38%)`;
+  const lightC = fossil ? "#fbf5e2" : `hsl(${hue},75%,72%)`;
+  ctx.lineWidth = 3 * u; ctx.strokeStyle = "rgba(60,35,10,.55)"; ctx.lineJoin = "round";
+  const ell = (x, y, rx, ry, fill) => { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); ctx.stroke(); };
+  // 尾
+  if (g.tail === 1) { ctx.beginPath(); ctx.moveTo(cx + 52 * u, cy + 18 * u); ctx.quadraticCurveTo(cx + 95 * u, cy + 30 * u, cx + 88 * u, cy - 8 * u); ctx.lineWidth = 11 * u; ctx.strokeStyle = darkC; ctx.stroke(); ctx.lineWidth = 3 * u; ctx.strokeStyle = "rgba(60,35,10,.55)"; }
+  if (g.tail === 2) { ctx.beginPath(); ctx.arc(cx + 78 * u, cy + 16 * u, 15 * u, 0.4, 5.2); ctx.lineWidth = 9 * u; ctx.strokeStyle = darkC; ctx.stroke(); ctx.lineWidth = 3 * u; ctx.strokeStyle = "rgba(60,35,10,.55)"; }
+  // 翼
+  if (g.wing >= 1) {
+    const ws = g.wing === 2 ? 1.35 : 0.85;
+    for (const sgn of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(cx + sgn * 30 * u, cy - 22 * u);
+      ctx.quadraticCurveTo(cx + sgn * (78 * ws) * u, cy - (66 * ws) * u, cx + sgn * (62 * ws) * u, cy - 2 * u);
+      ctx.quadraticCurveTo(cx + sgn * 38 * u, cy - 12 * u, cx + sgn * 30 * u, cy - 22 * u);
+      ctx.fillStyle = lightC; ctx.fill(); ctx.stroke();
+    }
+  }
+  // 脚
+  if (g.legs === 0) { ell(cx - 26 * u, cy + 52 * u, 13 * u, 8 * u, darkC); ell(cx + 26 * u, cy + 52 * u, 13 * u, 8 * u, darkC); }
+  if (g.legs === 1) { ell(cx - 28 * u, cy + 58 * u, 12 * u, 10 * u, darkC); ell(cx + 28 * u, cy + 58 * u, 12 * u, 10 * u, darkC); }
+  if (g.legs === 2 && !fossil) { ctx.beginPath(); ctx.ellipse(cx, cy + 62 * u, 34 * u, 7 * u, 0, 0, Math.PI * 2); ctx.fillStyle = "rgba(90,120,160,.35)"; ctx.fill(); }
+  // 体
+  let bw = 56, bh = 48;
+  if (g.body === 1) { bw = 74; bh = 36; }
+  if (g.body === 2) { bw = 46; bh = 60; }
+  if (g.body === 3) { bw = 64; bh = 54; }
+  ell(cx, cy + 8 * u, bw * u, bh * u, bodyC);
+  // 模様
+  ctx.save();
+  ctx.beginPath(); ctx.ellipse(cx, cy + 8 * u, bw * u, bh * u, 0, 0, Math.PI * 2); ctx.clip();
+  if (g.pattern === 1) { ctx.fillStyle = "rgba(255,255,255,.35)"; for (let i = -2; i < 3; i++) ctx.fillRect(cx - bw * u, cy + i * 20 * u, bw * 2 * u, 8 * u); }
+  if (g.pattern === 2) { ctx.fillStyle = "rgba(255,255,255,.45)"; for (const [dx, dy] of [[-30, -8], [8, 14], [30, -16], [-8, 30], [22, 34]]) { ctx.beginPath(); ctx.arc(cx + dx * u, cy + dy * u, 7 * u, 0, Math.PI * 2); ctx.fill(); } }
+  if (g.pattern === 3) { const gr = ctx.createLinearGradient(cx, cy - bh * u, cx, cy + bh * u); gr.addColorStop(0, "rgba(255,255,255,.55)"); gr.addColorStop(1, "rgba(0,0,0,.12)"); ctx.fillStyle = gr; ctx.fillRect(cx - bw * u, cy - bh * u, bw * 2 * u, bh * 2 * u); }
+  ctx.restore();
+  ell(cx, cy + 22 * u, bw * 0.52 * u, bh * 0.42 * u, lightC); // お腹
+  // 頭（体の上部に重ねる）
+  const hy = cy - bh * 0.52 * u;
+  let hw = 34, hh = 30;
+  if (g.head === 1) { hw = 36; hh = 30; }
+  if (g.head === 2) { hw = 28; hh = 34; }
+  if (g.head === 1) {
+    ctx.beginPath(); ctx.rect(cx - hw * u, hy - hh * u, hw * 2 * u, hh * 2 * u); ctx.fillStyle = bodyC; ctx.fill(); ctx.stroke();
+  } else if (g.head === 2) {
+    ctx.beginPath(); ctx.moveTo(cx - hw * u, hy + hh * u); ctx.lineTo(cx, hy - hh * 1.25 * u); ctx.lineTo(cx + hw * u, hy + hh * u); ctx.closePath(); ctx.fillStyle = bodyC; ctx.fill(); ctx.stroke();
+  } else {
+    ell(cx, hy, hw * u, hh * u, bodyC);
+  }
+  // 角
+  ctx.fillStyle = "#fdf6e3";
+  if (g.horn === 1) { ctx.beginPath(); ctx.moveTo(cx - 7 * u, hy - hh * u); ctx.lineTo(cx, hy - hh * u - 26 * u); ctx.lineTo(cx + 7 * u, hy - hh * u); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  if (g.horn === 2) { for (const sgn of [-1, 1]) { ctx.beginPath(); ctx.moveTo(cx + sgn * 20 * u - 6 * u, hy - hh * 0.8 * u); ctx.lineTo(cx + sgn * 30 * u, hy - hh * u - 22 * u); ctx.lineTo(cx + sgn * 20 * u + 6 * u, hy - hh * 0.8 * u); ctx.closePath(); ctx.fill(); ctx.stroke(); } }
+  if (g.horn === 3) { ctx.beginPath(); for (let i = 0; i < 5; i++) { const px = cx + (i - 2) * 13 * u; ctx.moveTo(px - 6 * u, hy - hh * u + 2 * u); ctx.lineTo(px, hy - hh * u - (i % 2 ? 14 : 22) * u); ctx.lineTo(px + 6 * u, hy - hh * u + 2 * u); } ctx.fillStyle = "#fbbf24"; ctx.fill(); ctx.stroke(); }
+  // 顔
+  ctx.fillStyle = "#2b2118";
+  for (const sgn of [-1, 1]) { ctx.beginPath(); ctx.arc(cx + sgn * 13 * u, hy - 2 * u, 4.6 * u, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(cx + sgn * 13 * u - 1.5 * u, hy - 3.5 * u, 1.7 * u, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill(); ctx.fillStyle = "#2b2118"; }
+  ctx.beginPath(); ctx.arc(cx, hy + 10 * u, 7 * u, 0.15 * Math.PI, 0.85 * Math.PI); ctx.lineWidth = 2.6 * u; ctx.strokeStyle = "#2b2118"; ctx.stroke();
+  // ほっぺ
+  if (!fossil) {
+    ctx.fillStyle = "rgba(255,120,120,.5)";
+    for (const sgn of [-1, 1]) { ctx.beginPath(); ctx.arc(cx + sgn * 24 * u, hy + 7 * u, 5.5 * u, 0, Math.PI * 2); ctx.fill(); }
+  }
+}
+function creatureCanvas(g, px, fossil) {
+  const cv = document.createElement("canvas");
+  cv.width = px; cv.height = px;
+  cv.style.width = px + "px"; cv.style.height = px + "px";
+  drawCreature(cv, g, px, fossil);
+  return cv;
+}
+</script>
+<script>
+"use strict";
+/* ============ 画面遷移 ============ */
+const $ = id => document.getElementById(id);
+function show(v) {
+  document.querySelectorAll(".view").forEach(el => el.classList.toggle("on", el.id === "v-" + v));
+  document.querySelectorAll("#tabbar button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+  if (v === "home") renderHome();
+  if (v === "rock") { renderRocks(); }
+  if (v === "box") renderBox();
+  if (v === "breed") renderBreed();
+  if (v === "dex") renderDex();
+  $("main").scrollTop = 0;
+}
+document.querySelectorAll("#tabbar button").forEach(b => b.addEventListener("click", () => show(b.dataset.v)));
+function openModal(html) { $("modalBox").innerHTML = html; $("modal").classList.add("on"); }
+function closeModal() { $("modal").classList.remove("on"); }
+$("modal").addEventListener("click", e => { if (e.target === $("modal")) closeModal(); });
+
+/* ============ 岩システム（新仕様） ============ */
+const RARITY = [
+  { nm: "ふつうの岩", ic: "🪨", layers: 2, hard: 0.10 },
+  { nm: "光る岩", ic: "✨🪨", layers: 3, hard: 0.25 },
+  { nm: "虹色の岩", ic: "🌈🪨", layers: 4, hard: 0.40 },
+];
+const ROCK_POOL = SPECIES.map((sp, i) => (sp.recipe ? -1 : i)).filter(i => i >= 0);
+const GRADE_ORDER = ["C", "B", "A", "S"];
+let BL = { part: -1, parent: 0 };
+function rollRock(minRarity) {
+  const p = Math.random();
+  let r = p < 0.10 ? 2 : p < 0.38 ? 1 : 0;
+  if (minRarity) r = Math.max(r, minRarity);
+  return { sp: pick(ROCK_POOL), part: ri(5), rarity: r };
+}
+function staminaRegen() {
+  if (!S.stamina) S.stamina = { cur: 30, last: Date.now() };
+  const now = Date.now();
+  const gain = Math.floor((now - (S.stamina.last || now)) / 120000);
+  if (gain > 0) {
+    S.stamina.cur = Math.min(30, S.stamina.cur + gain);
+    S.stamina.last = (S.stamina.last || now) + gain * 120000;
+    if (S.stamina.cur >= 30) S.stamina.last = now;
+  }
+}
+function spendStamina(n) {
+  staminaRegen();
+  if (S.stamina.cur < n) return false;
+  S.stamina.cur -= n; save();
+  return true;
+}
+function rankTier() { const p = S.rankPt || 0; return p >= 250 ? 4 : p >= 150 ? 3 : p >= 80 ? 2 : p >= 30 ? 1 : 0; }
+function rankName() { return ["見習い", "ブロンズ", "シルバー", "ゴールド", "プラチナ"][rankTier()]; }
+function renderHeader() {
+  staminaRegen();
+  const rk = $("stRank"); if (rk) rk.textContent = rankName();
+  const sm = $("stStamina"); if (sm) sm.textContent = S.stamina ? S.stamina.cur : 30;
+  const hs = $("homeStats");
+  if (hs) hs.innerHTML = `ランク：<b>${rankName()}</b>（${S.rankPt || 0}pt）<br>スタミナ：⚡${S.stamina ? S.stamina.cur : 30}/30（岩開けに5消費・2分で1回復）<br>自動クリーニング券：🎫 ${S.tickets || 0}枚<br>岩ストック：${(S.rocks || []).length}個 ／ てもち：${S.box.length}体 ／ ずかん：${Object.keys(S.dex).length}種`;
+}
+function renderHome() { drawMascot("mascotCv2"); renderHeader(); }
+$("btnGacha").addEventListener("click", () => {
+  const rock = rollRock(0);
+  S.rocks.push(rock); save(); renderHeader();
+  se("sparkle");
+  openModal(`<h3>🎰 岩ガチャ</h3><p style="font-size:40px;">${RARITY[rock.rarity].ic}</p><p style="font-size:14px;line-height:1.8;"><b>${RARITY[rock.rarity].nm}</b> を手に入れた！<br>中身は開けてのお楽しみ（レア度だけ判明）。<br>「岩・部位」タブから開けよう。</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">ゲット！</button>`);
+});
+$("btnEventRock").addEventListener("click", () => {
+  const rock = rollRock(1);
+  S.rocks.push(rock); save(); renderHeader();
+  se("win");
+  openModal(`<h3>🎁 イベント報酬！</h3><p style="font-size:40px;">${RARITY[rock.rarity].ic}</p><p style="font-size:14px;line-height:1.8;"><b>${RARITY[rock.rarity].nm}</b> を手に入れた！<br>（試作版：イベントクエストクリア報酬の代わり）</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">ゲット！</button>`);
+});
+function partKey(sp, part) { return sp + "-" + part; }
+function addPart(sp, part, grade) {
+  const k = partKey(sp, part);
+  const cur = S.parts[k];
+  if (!cur) { S.parts[k] = grade; return "new"; }
+  if (GRADE_ORDER.indexOf(grade) > GRADE_ORDER.indexOf(cur)) { S.parts[k] = grade; return "up"; }
+  return "keep";
+}
+function renderRocks() {
+  const el = $("rockList");
+  el.innerHTML = S.rocks.length ? "" : "<p class='desc'>岩がない。研究所で岩ガチャを引こう！</p>";
+  S.rocks.forEach((rock, i) => {
+    const R = RARITY[rock.rarity];
+    const card = document.createElement("div");
+    card.className = "card rockCard";
+    card.style.display = "block";
+    card.innerHTML = `<div style="display:flex;gap:10px;align-items:center;"><div class="rockIc">${R.ic}</div>
+      <div style="flex:1;"><div class="nm">${R.nm}</div><div class="meta">硬さ ${"★".repeat(rock.rarity + 1)} ／ 中身はレア度のみ判明<br>開けるのにスタミナ5</div></div></div>
+      <div class="autoRow">
+        <button class="btn teal" data-act="manual">🖌️ 手動で開ける</button>
+        <button class="btn sub" data-act="a1">🤖 自動① 無料</button>
+        <button class="btn sub" data-act="a2">🤖 自動② 券</button>
+        <button class="btn sub" data-act="a3">🤖 自動③ 券</button>
+      </div>`;
+    card.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+      const act = b.dataset.act;
+      if (act === "manual") {
+        if (!spendStamina(5)) { openModal(`<h3>⚡ スタミナ不足</h3><p style="font-size:14px;line-height:1.8;">岩を開けるにはスタミナ5が必要。<br>時間で回復するよ（2分で1）。</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">待つ</button>`); return; }
+        startClean(rock);
+      } else {
+        autoClean(i, Number(act[1]));
+      }
+    }));
+    el.appendChild(card);
+  });
+  renderParts();
+}
+function renderParts() {
+  const el = $("partList");
+  el.innerHTML = "";
+  ROCK_POOL.forEach(spIdx => {
+    const sp = SPECIES[spIdx];
+    const row = document.createElement("div");
+    row.className = "card partRow";
+    const chips = PARTS.map((pn, pi) => {
+      const g = S.parts[partKey(spIdx, pi)];
+      return `<span class="pchip ${g ? (g === "S" ? "gS" : "got") : ""}">${pn}${g ? ":" + GRADE_JP[g] : ""}</span>`;
+    }).join("");
+    const complete = PARTS.every((_, pi) => S.parts[partKey(spIdx, pi)]);
+    row.innerHTML = `<div style="flex:1;min-width:0;"><div class="nm" style="font-size:14px;">${sp.nm}</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">${chips}</div></div>`;
+    row.insertBefore(creatureCanvas(sp.genes, 44), row.firstChild);
+    if (complete) {
+      const b = document.createElement("button");
+      b.className = "btn teal"; b.style.flex = "none"; b.textContent = "✨ 復活！";
+      b.addEventListener("click", () => reviveParts(spIdx));
+      row.appendChild(b);
+    }
+    el.appendChild(row);
+  });
+}
+function autoClean(idx, stage) {
+  const rock = S.rocks[idx];
+  if (!rock) return;
+  if (stage >= 2 && (S.tickets || 0) <= 0) { openModal(`<h3>🎫 券がない</h3><p style="font-size:14px;line-height:1.8;">自動②③には自動クリーニング券が必要だよ。</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">閉じる</button>`); return; }
+  if (!spendStamina(5)) { openModal(`<h3>⚡ スタミナ不足</h3><p style="font-size:14px;line-height:1.8;">スタミナ5が必要。時間で回復するよ。</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">待つ</button>`); return; }
+  if (stage >= 2) S.tickets--;
+  const roll = Math.random() * 100;
+  let grade;
+  if (stage === 3) grade = "S";
+  else if (stage === 2) grade = roll < 25 ? "S" : roll < 70 ? "A" : "B";
+  else grade = roll < 5 ? "S" : roll < 30 ? "A" : roll < 80 ? "B" : "C";
+  S.rocks.splice(idx, 1);
+  const res = addPart(rock.sp, rock.part, grade);
+  save(); renderRocks(); renderHeader();
+  se("win");
+  const sp = SPECIES[rock.sp];
+  openModal(`<h3>🤖 自動クリーニング完了（${["", "①", "②", "③"][stage]}段階）</h3><p style="font-size:14px;line-height:1.9;"><b>${sp.nm}</b> の <b>${PARTS[rock.part]}</b> の化石<br>評価：<span class="grade">${grade}（${GRADE_JP[grade]}）</span>${res === "up" ? "<br>✨ 前より良い評価で更新！" : res === "keep" ? "<br>（良い方を保持）" : ""}</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">ゲット！</button>`);
+}
+function reviveParts(spIdx) {
+  const sp = SPECIES[spIdx];
+  const parts = {};
+  for (let pi = 0; pi < 5; pi++) { parts[pi] = S.parts[partKey(spIdx, pi)]; delete S.parts[partKey(spIdx, pi)]; }
+  const g = Object.assign({}, sp.genes);
+  const c = makeCreature(g, sp.el, sp.skills, { kind: "復活", name: sp.nm, spName: sp.nm, parts });
+  c.stats = statsFromGenes(g, sp.bias, 1);
+  c.maxhp = effStats(c).hp;
+  addCreature(c);
+  save(); renderRocks();
+  se("win");
+  creatureModal(c, `✨ ${sp.nm} 復活！<br><span style="font-size:13px;">部位の評価がステータスに反映されてるよ</span>`);
+}
+function renderBreedLock() {
+  const el = $("breedLock");
+  if (!el) return;
+  if (S.sel.length !== 2) { el.innerHTML = ""; return; }
+  const pair = S.sel.map(id => S.box.find(c => c.id === id));
+  const a = pair[0], b = pair[1];
+  if (!a || !b) { el.innerHTML = ""; return; }
+  const hl = on => on ? "background:linear-gradient(180deg,#fbbf24,#f59e0b);color:#fff;" : "";
+  const partBtns = PARTS.map((pn, pi) => `<button class="btn sub" data-p="${pi}" style="${hl(BL.part === pi)}">${pn}</button>`).join("");
+  el.innerHTML = `<div class="card" style="display:block;margin-top:10px;"><div class="nm" style="font-size:14px;">🎯 部位の指定継承（1つだけ確実に引き継げる）</div>
+    <div class="meta">指定なしなら全部ランダム継承。レシピ：キングレックス×ハネプテラ／ガチゴーレム×デンキネズミ で新種！</div>
+    <div class="lockRow">${partBtns}</div>
+    <div class="lockRow">
+      <button class="btn sub" data-par="0" style="${hl(BL.part >= 0 && BL.parent === 0)}">${a.name}から</button>
+      <button class="btn sub" data-par="1" style="${hl(BL.part >= 0 && BL.parent === 1)}">${b.name}から</button>
+      <button class="btn sub" data-p="-1">指定なし</button>
+    </div></div>`;
+  el.querySelectorAll("[data-p]").forEach(btn => btn.addEventListener("click", () => { BL.part = Number(btn.dataset.p); renderBreed(); }));
+  el.querySelectorAll("[data-par]").forEach(btn => btn.addEventListener("click", () => { BL.parent = Number(btn.dataset.par); if (BL.part < 0) BL.part = 0; renderBreed(); }));
+}
+
+/* ============ クリーニング（本家式） ============ */
+const CV = 340, CELL = 10, GN = CV / CELL; // 34x34グリッド
+let CL = null;
+function mkCanvas() { const c = document.createElement("canvas"); c.width = c.height = CV; return c; }
+function drawFossilArt(ctx) {
+  ctx.clearRect(0, 0, CV, CV);
+  ctx.save();
+  ctx.translate(170, 170);
+  ctx.fillStyle = "#fdf6e3"; ctx.strokeStyle = "#c9ab72"; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.ellipse(0, 0, 46, 30, 0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(30, 18); ctx.quadraticCurveTo(95, 55, 120, 30); ctx.quadraticCurveTo(95, 28, 40, -2); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(-95, -55, 17, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(-95, 55, 17, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-95, -55); ctx.lineTo(20, 0); ctx.lineTo(-95, 55); ctx.lineWidth = 20; ctx.strokeStyle = "#fdf6e3"; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-95, -55); ctx.lineTo(20, 0); ctx.lineTo(-95, 55); ctx.lineWidth = 3; ctx.strokeStyle = "#c9ab72"; ctx.stroke();
+  ctx.fillStyle = "#8a6a3b";
+  ctx.beginPath(); ctx.arc(8, -4, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+/* オリジナルマスコット「モグ博士」 */
+function drawMascot(id) {
+  const cv = $(id || "mascotCv"); if (!cv) return;
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, 64, 64);
+  ctx.lineWidth = 2; ctx.strokeStyle = "rgba(60,35,10,.5)";
+  ctx.fillStyle = "#a9743f";
+  ctx.beginPath(); ctx.arc(32, 38, 20, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#e8cba0";
+  ctx.beginPath(); ctx.ellipse(32, 46, 11, 8, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#f28bb4";
+  ctx.beginPath(); ctx.ellipse(32, 42, 5.5, 4, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#2b2118";
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(32 + s * 8, 34, 2.6, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = "#fff";
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(32 + s * 8 - 1, 33, 1, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = "#fbbf24";
+  ctx.beginPath(); ctx.arc(32, 31, 21, Math.PI, 0); ctx.fill(); ctx.stroke();
+  ctx.fillRect(9, 29, 46, 5); ctx.strokeRect(9, 29, 46, 5);
+  ctx.fillStyle = "#fff7cc";
+  ctx.beginPath(); ctx.arc(32, 17, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = "#2b2118"; ctx.lineWidth = 1.8;
+  ctx.beginPath(); ctx.arc(32, 47, 4, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+}
+function say(text, force) {
+  const now = Date.now();
+  if (!force && CL && CL.sayAt && now - CL.sayAt < 1600) return;
+  if (CL) CL.sayAt = now;
+  const el = $("mascotSay");
+  if (el) el.textContent = text;
+}
+function goodPop(text) {
+  const el = $("goodPop");
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
+  se("sparkle");
+}
+function startClean(rock) {
+  show("clean");
+  document.getElementById("app").classList.add("focus");
+  stopCleanTimers();
+  // 下地（台座）
+  const base = mkCanvas(); const bx = base.getContext("2d");
+  bx.fillStyle = "#d9c08d"; bx.fillRect(0, 0, CV, CV);
+  for (let i = 0; i < 500; i++) { bx.fillStyle = `rgba(140,105,55,${rnd(0.04, 0.12)})`; bx.beginPath(); bx.arc(rnd(0, CV), rnd(0, CV), rnd(1, 4), 0, Math.PI * 2); bx.fill(); }
+  // 化石アート＆マスク（復活する種の姿そのものを化石化して使う）
+  const fossilCv = mkCanvas();
+  drawCreature(fossilCv, SPECIES[rock.sp].genes, CV, true);
+  const fdata = fossilCv.getContext("2d").getImageData(0, 0, CV, CV).data;
+  const mask = new Uint8Array(GN * GN);
+  let fossilTotal = 0;
+  for (let gy = 0; gy < GN; gy++) for (let gx = 0; gx < GN; gx++) {
+    const px = ((gy * CELL + 5) * CV + (gx * CELL + 5)) * 4;
+    if (fdata[px + 3] > 90) { mask[gy * GN + gx] = 1; fossilTotal++; }
+  }
+  // 部位化石：部位の領域だけを残す
+  const inPart = (gx, gy) => {
+    const x = gx / GN, y = gy / GN;
+    switch (rock.part) {
+      case 0: return y < 0.42;
+      case 1: return y >= 0.33 && y < 0.74 && x > 0.22 && x < 0.78;
+      case 2: return (x < 0.30 || x > 0.70) && y < 0.78;
+      case 3: return y >= 0.68;
+      case 4: return x > 0.60 && y >= 0.40;
+    }
+    return true;
+  };
+  {
+    let kept = 0;
+    const m2 = new Uint8Array(GN * GN);
+    for (let gy = 0; gy < GN; gy++) for (let gx = 0; gx < GN; gx++) {
+      const i = gy * GN + gx;
+      if (mask[i] && inPart(gx, gy)) { m2[i] = 1; kept++; }
+    }
+    if (kept >= 12) { for (let i = 0; i < GN * GN; i++) mask[i] = m2[i]; fossilTotal = kept; }
+  }
+  // X線用シルエット
+  const xrayCv = mkCanvas(); const xx = xrayCv.getContext("2d");
+  xx.drawImage(fossilCv, 0, 0);
+  for (let gy = 0; gy < GN; gy++) for (let gx = 0; gx < GN; gx++) if (!mask[gy * GN + gx]) xx.clearRect(gx * CELL, gy * CELL, CELL, CELL);
+  xx.globalCompositeOperation = "source-in";
+  xx.fillStyle = "rgba(56,224,255,0.9)"; xx.fillRect(0, 0, CV, CV);
+  // 岩と粉
+  const rockArr = new Uint8Array(GN * GN);
+  const shade = new Float32Array(GN * GN);
+  const RR = RARITY[rock.rarity];
+  for (let i = 0; i < GN * GN; i++) { rockArr[i] = Math.max(1, RR.layers - (mask[i] ? 1 : 0) + (Math.random() < RR.hard ? 1 : 0)); shade[i] = rnd(-14, 14); }
+  CL = {
+    base, fossilCv, xrayCv, mask, fossilTotal, nonTotal: GN * GN - fossilTotal,
+    rock: rockArr, dust: new Float32Array(GN * GN), shade,
+    rockCv: mkCanvas(), dustCv: mkCanvas(),
+    dmg: 0, tool: "hammer", xray: 2, xrayUntil: 0, flashUntil: 0,
+    startAt: Date.now(), finished: false, rockObj: rock,
+    ptr: { down: false, x: 0, y: 0 }, drillLast: new Int32Array(GN * GN),
+    cellStress: new Float32Array(GN * GN), grazeUntil: 0,
+    tickId: null, drillId: null, score: 0, parts: { rock: 0, clean: 0, around: 0, pen: 0 },
+  };
+  for (let i = 0; i < GN * GN; i++) { paintRock(i); }
+  composite();
+  selectCTool("hammer");
+  $("xrayN").textContent = CL.xray;
+  CL.flags = {}; CL.sayAt = 0; CL.dmgSayAt = 0; CL.tickN = 0; CL.exposedFrac = 0;
+  drawMascot();
+  $("cleanRockInfo").textContent = `${RARITY[rock.rarity].ic} ${RARITY[rock.rarity].nm}（硬さ${"★".repeat(rock.rarity + 1)}）`;
+  const pw = $("progCvWrap");
+  pw.innerHTML = ""; pw.appendChild(creatureCanvas(SPECIES[rock.sp].genes, 54, true));
+  say("まずはX線で形を覚えるのがコツ！", true);
+  updateCleanUI();
+  CL.tickId = setInterval(cleanTick, 100);
+  bindCleanPointer();
+}
+function stopCleanTimers() {
+  if (CL) { if (CL.tickId) clearInterval(CL.tickId); if (CL.drillId) clearInterval(CL.drillId); }
+}
+function paintRock(i) {
+  const ctx = CL.rockCv.getContext("2d");
+  const x = (i % GN) * CELL, y = Math.floor(i / GN) * CELL;
+  ctx.clearRect(x, y, CELL, CELL);
+  const t = CL.rock[i];
+  if (!t) return;
+  const s = CL.shade[i];
+  ctx.fillStyle = t >= 2 ? `rgb(${138 + s},${90 + s * 0.7},${43 + s * 0.5})` : `rgb(${178 + s},${132 + s * 0.7},${82 + s * 0.5})`;
+  ctx.fillRect(x, y, CELL, CELL);
+  ctx.fillStyle = "rgba(255,255,255,0.10)";
+  ctx.fillRect(x, y, CELL, 2);
+  ctx.fillStyle = "rgba(60,35,5,0.14)";
+  const sx = (i * 37) % 7, sy = (i * 53) % 7;
+  ctx.fillRect(x + 1 + sx, y + 2 + sy, 2, 2);
+  ctx.fillRect(x + 8 - sx, y + 8 - sy, 2, 2);
+}
+function paintDust(i) {
+  const ctx = CL.dustCv.getContext("2d");
+  const x = (i % GN) * CELL, y = Math.floor(i / GN) * CELL;
+  ctx.clearRect(x, y, CELL, CELL);
+  const d = CL.dust[i];
+  if (d < 0.05) return;
+  ctx.fillStyle = `rgba(219,192,142,${Math.min(0.30, d * 0.32)})`;
+  ctx.beginPath(); ctx.arc(x + CELL / 2, y + CELL / 2, CELL * 0.72, 0, Math.PI * 2); ctx.fill();
+}
+function composite() {
+  const cv = $("cleanCv"); if (!cv || !CL) return;
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, CV, CV);
+  ctx.drawImage(CL.base, 0, 0);
+  ctx.drawImage(CL.fossilCv, 0, 0);
+  ctx.drawImage(CL.rockCv, 0, 0);
+  ctx.drawImage(CL.dustCv, 0, 0);
+  const now = Date.now();
+  if (now < CL.xrayUntil) { ctx.globalAlpha = 0.85; ctx.drawImage(CL.xrayCv, 0, 0); ctx.globalAlpha = 1; }
+  if (now < CL.flashUntil) {
+    ctx.save(); ctx.globalCompositeOperation = "source-atop";
+    ctx.globalAlpha = 0.35; ctx.drawImage(CL.xrayCv, 0, 0); ctx.restore();
+    ctx.globalAlpha = 1;
+    ctx.save(); ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "rgba(239,68,68,0.20)"; ctx.fillRect(0, 0, CV, CV); ctx.restore();
+  } else if (now < (CL.grazeUntil || 0)) {
+    ctx.save(); ctx.fillStyle = "rgba(250,204,21,0.13)"; ctx.fillRect(0, 0, CV, CV); ctx.restore();
+  }
+}
+function cellsIn(cx, cy, r) {
+  const out = [];
+  const gx0 = Math.max(0, Math.floor((cx - r) / CELL)), gx1 = Math.min(GN - 1, Math.floor((cx + r) / CELL));
+  const gy0 = Math.max(0, Math.floor((cy - r) / CELL)), gy1 = Math.min(GN - 1, Math.floor((cy + r) / CELL));
+  for (let gy = gy0; gy <= gy1; gy++) for (let gx = gx0; gx <= gx1; gx++) {
+    const ccx = gx * CELL + 5, ccy = gy * CELL + 5;
+    if ((ccx - cx) ** 2 + (ccy - cy) ** 2 <= r * r) out.push(gy * GN + gx);
+  }
+  return out;
+}
+function dustSplash(cx, cy, amt) {
+  for (const i of cellsIn(cx, cy, 30)) {
+    const nd = Math.min(1, CL.dust[i] + amt * rnd(0.6, 1.1));
+    if (Math.abs(nd - CL.dust[i]) > 0.03) { CL.dust[i] = nd; paintDust(i); }
+  }
+}
+function addDamage(n) {
+  CL.dmg = Math.min(100, CL.dmg + n);
+  CL.flashUntil = Date.now() + 220;
+  if (navigator.vibrate) try { navigator.vibrate(50); } catch (e) {}
+  const now = Date.now();
+  if (now - (CL.dmgSayAt || 0) > 3500) {
+    CL.dmgSayAt = now;
+    say("あぶない！化石に当たってるよ。ドリルで慎重に！", true);
+  }
+}
+function grazeFeedback() {
+  CL.grazeUntil = Date.now() + 200;
+  const now = Date.now();
+  if (now - (CL.grazeSayAt || 0) > 4000) {
+    CL.grazeSayAt = now;
+    say("かすった！セーフ…でも気をつけて", true);
+  }
+}
+function hammerAt(x, y) {
+  se("hammer");
+  let dmgCells = 0, removed = 0;
+  for (const i of cellsIn(x, y, 36)) {
+    if (CL.rock[i] > 0) { CL.rock[i]--; paintRock(i); dustSplash(x, y, 0.16); removed++; }
+    else if (CL.mask[i]) dmgCells++;
+  }
+  // 化石の耐久度：かすった程度（3マス以下）はノーダメージ。しっかり当てた分だけ傷つく
+  if (dmgCells >= 4) addDamage(Math.min(6, (dmgCells - 3) * 0.55));
+  else if (dmgCells > 0) grazeFeedback();
+  else if (removed >= 11) { goodPop("GREAT!"); say(pick(["すごい！一気に割れたね！", "お見事！その調子！"])); }
+  else if (removed >= 6) { goodPop("GOOD!"); if (Math.random() < 0.5) say(pick(["いい調子！", "うまい！化石の近くはドリルでね"])); }
+  composite(); updateCleanUI();
+}
+function drillBAt(x, y) {
+  se("hammer");
+  let dmgCells = 0, removed = 0;
+  for (const i of cellsIn(x, y, 20)) {
+    if (CL.rock[i] > 0) { CL.rock[i] = Math.max(0, CL.rock[i] - 2); paintRock(i); dustSplash(x, y, 0.10); removed++; }
+    else if (CL.mask[i]) dmgCells++;
+  }
+  if (dmgCells >= 6) addDamage(Math.min(5, (dmgCells - 5) * 0.5));
+  else if (dmgCells > 0) grazeFeedback();
+  else if (removed >= 11) goodPop("GOOD!");
+  composite(); updateCleanUI();
+}
+function drillAt(x, y) {
+  const now = Date.now();
+  let changed = false, grazed = false;
+  for (const i of cellsIn(x, y, 14)) {
+    if (now - CL.drillLast[i] < 230) continue;
+    CL.drillLast[i] = now;
+    if (CL.rock[i] > 0) { CL.rock[i]--; paintRock(i); changed = true; }
+    else if (CL.mask[i]) {
+      // 耐久度：かすりはストレスが溜まるだけ。同じ場所を削り続けると初めて傷つく
+      CL.cellStress[i] += 0.55;
+      if (CL.cellStress[i] >= 1) { CL.cellStress[i] = 0.35; addDamage(0.45); changed = true; }
+      else grazed = true;
+    }
+  }
+  if (grazed && !changed) grazeFeedback();
+  if (changed) { dustSplash(x, y, 0.05); composite(); updateCleanUI(); }
+  else if (grazed) composite();
+}
+function airAt(x, y) {
+  let changed = false;
+  for (const i of cellsIn(x, y, 46)) {
+    if (CL.dust[i] > 0.02) { CL.dust[i] = 0; paintDust(i); changed = true; }
+  }
+  if (changed) composite();
+}
+function moveRing(x, y) {
+  if (!CL) return;
+  const cv = $("cleanCv");
+  const ring = $("cursorRing");
+  const scale = cv.clientWidth / CV;
+  const r = CL.tool === "hammer" ? 36 : CL.tool === "drillB" ? 20 : CL.tool === "drill" ? 14 : 46;
+  ring.style.display = "block";
+  ring.style.width = ring.style.height = (r * 2 * scale) + "px";
+  ring.style.left = (cv.offsetLeft + x * scale) + "px";
+  ring.style.top = (cv.offsetTop + y * scale) + "px";
+}
+function bindCleanPointer() {
+  const cv = $("cleanCv");
+  const pos = e => {
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (CV / r.width), y: (e.clientY - r.top) * (CV / r.height) };
+  };
+  cv.onpointerdown = e => {
+    if (!CL || CL.finished) return;
+    const p = pos(e); CL.ptr = { down: true, x: p.x, y: p.y };
+    cv.setPointerCapture(e.pointerId);
+    if (CL.tool === "hammer") hammerAt(p.x, p.y);
+    else if (CL.tool === "drill") { drillAt(p.x, p.y); CL.drillId = setInterval(() => { if (CL.ptr.down) drillAt(CL.ptr.x, CL.ptr.y); }, 95); }
+    else if (CL.tool === "drillB") { drillBAt(p.x, p.y); CL.drillId = setInterval(() => { if (CL.ptr.down) drillBAt(CL.ptr.x, CL.ptr.y); }, 160); }
+    else if (CL.tool === "air") airAt(p.x, p.y);
+  };
+  cv.onpointermove = e => {
+    const p = pos(e);
+    moveRing(p.x, p.y);
+    if (!CL || !CL.ptr.down) return;
+    CL.ptr.x = p.x; CL.ptr.y = p.y;
+    if (CL.tool === "air") airAt(p.x, p.y);
+  };
+  cv.onpointerleave = () => { $("cursorRing").style.display = "none"; };
+  const up = () => { if (CL) { CL.ptr.down = false; if (CL.drillId) { clearInterval(CL.drillId); CL.drillId = null; } } };
+  cv.onpointerup = cv.onpointercancel = up;
+}
+function calcScore() {
+  let exposed = 0, cleanExposed = 0, cleared = 0;
+  for (let i = 0; i < GN * GN; i++) {
+    if (CL.mask[i]) { if (CL.rock[i] === 0) { exposed++; if (CL.dust[i] < 0.3) cleanExposed++; } }
+    else if (CL.rock[i] === 0) cleared++;
+  }
+  CL.exposedFrac = exposed / CL.fossilTotal;
+  const rock = 60 * exposed / CL.fossilTotal;
+  const clean = 25 * cleanExposed / CL.fossilTotal;
+  const around = 15 * cleared / CL.nonTotal;
+  const pen = CL.dmg * 0.6;
+  CL.parts = { rock: Math.round(rock), clean: Math.round(clean), around: Math.round(around), pen: Math.round(pen) };
+  CL.score = Math.max(0, Math.min(100, Math.round(rock + clean + around - pen)));
+}
+function updateCleanUI() {
+  calcScore();
+  $("cleanScore").textContent = CL.score;
+  $("timeGauge").style.width = Math.round((CL.exposedFrac || 0) * 100) + "%";
+  $("cleanDmgGauge").style.width = (100 - CL.dmg) + "%";
+  $("progFill").style.width = Math.round((CL.exposedFrac || 0) * 100) + "%";
+  $("progPct").textContent = `発掘率 ${Math.round((CL.exposedFrac || 0) * 100)}%`;
+  $("cleanInfo").textContent = `🦴 耐久度 ${100 - Math.round(CL.dmg)}%（岩${CL.parts.rock}・仕上${CL.parts.clean}・周${CL.parts.around}・減点-${CL.parts.pen}）`;
+}
+function cleanTick() {
+  if (!CL || CL.finished) return;
+  if (Date.now() < CL.xrayUntil || CL.xrayUntil && Date.now() - CL.xrayUntil < 150) composite();
+  updateCleanUI();
+  CL.tickN = (CL.tickN || 0) + 1;
+  // かすりストレスは時間で回復（押し続けなければ傷にならない）
+  for (let i = 0; i < GN * GN; i++) if (CL.cellStress[i] > 0) CL.cellStress[i] = Math.max(0, CL.cellStress[i] - 0.045);
+  if (CL.tickN % 10 === 0 && CL.flags) {
+    let dustSum = 0;
+    for (let i = 0; i < GN * GN; i++) if (CL.mask[i]) dustSum += CL.dust[i];
+    const dustAvg = dustSum / CL.fossilTotal;
+    if (dustAvg > 0.38 && !CL.flags.dust) { CL.flags.dust = 1; say("粉がたまってきたよ。エアで飛ばすと仕上がりアップ！"); }
+    if (dustAvg < 0.2) CL.flags.dust = 0;
+    if (CL.exposedFrac >= 0.5 && !CL.flags.half) { CL.flags.half = 1; say("半分出てきた！あせらず丁寧に"); }
+    if (CL.exposedFrac >= 0.9 && !CL.flags.n90) { CL.flags.n90 = 1; say("あと少し！仕上げはドリルとエアで"); }
+  }
+}
+function selectCTool(t) {
+  if (CL) CL.tool = t;
+  for (const [id, name] of [["ctHammer", "hammer"], ["ctDrillB", "drillB"], ["ctDrill", "drill"], ["ctAir", "air"]]) {
+    $(id).classList.toggle("on", t === name);
+  }
+}
+$("ctHammer").addEventListener("click", () => selectCTool("hammer"));
+$("ctDrill").addEventListener("click", () => selectCTool("drill"));
+$("ctDrillB").addEventListener("click", () => selectCTool("drillB"));
+$("ctAir").addEventListener("click", () => selectCTool("air"));
+$("ctXray").addEventListener("click", () => {
+  if (!CL || CL.finished || CL.xray <= 0) return;
+  CL.xray--; $("xrayN").textContent = CL.xray;
+  CL.xrayUntil = Date.now() + 1200;
+  composite();
+});
+$("btnCleanRetry").addEventListener("click", () => { if (CL && CL.rockObj) startClean(CL.rockObj); });
+$("btnFinish").addEventListener("click", () => finishClean(false));
+function finishClean(auto) {
+  if (!CL || CL.finished) return;
+  CL.finished = true;
+  se("win");
+  document.getElementById("app").classList.remove("focus");
+  stopCleanTimers();
+  calcScore();
+  const score = CL.score;
+  const scoreGrade = score >= 90 ? "S" : score >= 78 ? "A" : score >= 60 ? "B" : "C";
+  const cap = CL.dmg < 15 ? "S" : CL.dmg < 35 ? "A" : CL.dmg < 60 ? "B" : "C";
+  const order = ["S", "A", "B", "C"];
+  const grade = order[Math.max(order.indexOf(scoreGrade), order.indexOf(cap))];
+  const rock = CL.rockObj;
+  const idx = S.rocks.indexOf(rock);
+  if (idx >= 0) S.rocks.splice(idx, 1);
+  const p = CL.parts;
+  const res = addPart(rock.sp, rock.part, grade);
+  save();
+  show("rock");
+  const sp = SPECIES[rock.sp];
+  const complete = PARTS.every((_, pi) => S.parts[partKey(rock.sp, pi)]);
+  const prog = PARTS.map((_, pi) => S.parts[partKey(rock.sp, pi)] ? "✅" : "⬜").join("");
+  openModal(`<h3>✨ 骨を取り出した！</h3>
+    <p style="font-size:14px;line-height:1.9;">スコア <b>${score}</b>点（岩${p.rock}・仕上${p.clean}・周${p.around}・減点-${p.pen}）<br>
+    <b>${sp.nm}</b> の <b>${PARTS[rock.part]}</b> の化石<br>評価：<span class="grade">${grade}（${GRADE_JP[grade]}）</span>${res === "up" ? "<br>✨ 前より良い評価で更新！" : res === "keep" ? "<br>（同じ部位は良い方を保持）" : ""}<br>
+    部位そろい具合：${prog}<br>
+    ${complete ? "🎉 <b>部位が全部そろった！「岩・部位」タブから復活できるよ！</b>" : "部位を5つそろえると復活できるよ"}</p>
+    <button class="btn big" style="margin-top:10px;" onclick="closeModal()">やった！</button>`);
+}
+
+/* ============ てもち・交配リスト ============ */
+function sbar(label, v, max, color) {
+  return `<div class="sbar"><span>${label}</span><div class="strack"><div style="width:${Math.min(100, Math.round(v / max * 100))}%;background-color:${color};"></div></div><b>${v}</b></div>`;
+}
+function creatureCard(c, opts) {
+  opts = opts || {};
+  const div = document.createElement("div");
+  div.className = "card creature" + (opts.selected ? " sel" : "") + (c.grade === "S" ? " gold" : c.grade === "A" ? " silver" : "");
+  const cv = creatureCanvas(c.genes, 84);
+  div.appendChild(cv);
+  const es = effStats(c);
+  const inf = document.createElement("div");
+  inf.style.flex = "1";
+  inf.style.minWidth = "0";
+  inf.innerHTML = `<div class="nm">${c.name}</div>
+    <div class="meta">${ELNAME[c.el]}属性 ／ ${c.origin} ／ Lv${c.lv || 1}</div><div class="expbar"><div style="width:${Math.min(100, Math.round((c.exp || 0) / ((c.lv || 1) * 50) * 100))}%"></div></div>
+    ${sbar("HP", es.hp, 160, "#4ade80")}
+    ${sbar("こうげき", es.atk, 50, "#f87171")}
+    ${sbar("ぼうぎょ", es.def, 50, "#60a5fa")}
+    ${sbar("すばやさ", es.spd, 45, "#fbbf24")}
+    <div class="chips">${c.skills.map(s => `<span class="chip el">${skillById(s).nm}</span>`).join("")}
+    <span class="chip">${PARTNAME.horn[c.genes.horn]}</span><span class="chip">${PARTNAME.wing[c.genes.wing]}</span><span class="chip">${PARTNAME.pattern[c.genes.pattern]}</span></div>${c.parts ? `<div class="chips">${PARTS.map((pn, pi) => `<span class="chip">${pn}:${c.parts[pi] ? GRADE_JP[c.parts[pi]] : "-"}</span>`).join("")}</div>` : ""}`;
+  div.appendChild(inf);
+  if (opts.onClick) div.addEventListener("click", () => opts.onClick(c));
+  return div;
+}
+function renderBox() {
+  const el = $("boxList");
+  el.innerHTML = S.box.length ? "" : "<p class='desc'>まだいない。部位をそろえて復活させよう！</p>";
+  S.box.forEach(c => el.appendChild(creatureCard(c, {
+    onClick: () => { show("breed"); toggleSel(c); },
+  })));
+}
+function renderBreed() {
+  const el = $("breedList");
+  el.innerHTML = S.box.length ? "" : "<p class='desc'>てもちがいないと交配できない。</p>";
+  S.box.forEach(c => el.appendChild(creatureCard(c, {
+    selected: S.sel.includes(c.id),
+    onClick: () => toggleSel(c),
+  })));
+  const btn = $("btnBreed");
+  btn.disabled = S.sel.length !== 2;
+  btn.textContent = S.sel.length === 2 ? "💞 交配する！" : `💞 交配する（あと${2 - S.sel.length}体えらんでね）`;
+  renderBreedLock();
+}
+function toggleSel(c) {
+  const i = S.sel.indexOf(c.id);
+  if (i >= 0) S.sel.splice(i, 1);
+  else { S.sel.push(c.id); if (S.sel.length > 2) S.sel.shift(); }
+  renderBreed();
+}
+$("btnBreed").addEventListener("click", () => {
+  const [a, b] = S.sel.map(id => S.box.find(c => c.id === id));
+  if (!a || !b) return;
+  const child = breedCreatures(a, b);
+  BL = { part: -1, parent: 0 };
+  se("sparkle");
+  addCreature(child);
+  S.sel = []; save();
+  creatureModal(child, `🧬 交配で新しい命が誕生！<br><span style="font-size:13px;">${a.name} × ${b.name}</span>`);
+  show("breed");
+});
+function creatureModal(c, title) {
+  openModal(`<h3>${title}</h3>
+    <div id="modalCv" style="display:flex;justify-content:center;margin:8px 0;"></div>
+    <div style="font-weight:900;font-size:18px;">${c.name}</div>
+    <p style="font-size:13px;color:#7a6748;line-height:1.7;">${ELNAME[c.el]}属性 ／ Lv${c.lv || 1} ／ HP ${effStats(c).hp} ／ こうげき ${effStats(c).atk} ／ ぼうぎょ ${effStats(c).def} ／ すばやさ ${effStats(c).spd}<br>
+    とくぎ：${c.skills.map(s => skillById(s).nm).join("、")}</p>
+    <button class="btn big" style="margin-top:10px;" onclick="closeModal()">やったー！</button>`);
+  $("modalCv").appendChild(creatureCanvas(c.genes, 170));
+}
+
+/* ============ 図鑑 ============ */
+function renderDex() {
+  const grid = $("dexGrid");
+  grid.innerHTML = "";
+  const keys = Object.keys(S.dex);
+  $("dexEmpty").style.display = keys.length ? "none" : "block";
+  keys.forEach(k => {
+    const d = S.dex[k];
+    const cell = document.createElement("div");
+    cell.className = "dexcell";
+    cell.appendChild(creatureCanvas(d.genes, 76));
+    const nm = document.createElement("div"); nm.className = "nm"; nm.textContent = d.name;
+    const ct = document.createElement("div"); ct.className = "ct"; ct.textContent = `×${d.count}`;
+    cell.appendChild(nm); cell.appendChild(ct);
+    grid.appendChild(cell);
+  });
+}
+
+/* ============ バトル ============ */
+let B = null;
+function enemyTeam() {
+  const team = [];
+  const avg = S.box.length ? S.box.slice(0, 3).reduce((s, c) => s + c.stats.hp, 0) / Math.min(3, S.box.length) : 50;
+  for (let i = 0; i < 3; i++) {
+    const sp = SPECIES[ri(SPECIES.length)];
+    const c = makeCreature(Object.assign({}, sp.genes), sp.el, sp.skills, { kind: "野生", name: sp.nm });
+    c.stats = statsFromGenes(c.genes, sp.bias, rnd(0.9, 1.05) * (1 + rankTier() * 0.10)); c.maxhp = c.stats.hp;
+    team.push(c);
+  }
+  return team;
+}
+function startBattle() {
+  if (!S.box.length) { alert("てもちがいない！部位をそろえて復活させよう"); return; }
+  const mine = S.box.slice(0, 3).map(c => { const es = effStats(c); return { ref: c, name: c.name + " Lv" + (c.lv || 1), genes: c.genes, el: c.el, skills: c.skills.slice(), stats: es, hp: es.hp, maxhp: es.hp, auto: false }; });
+  const foe = enemyTeam().map(c => ({ ref: c, name: c.name, genes: c.genes, el: c.el, skills: c.skills.slice(), stats: c.stats, hp: c.stats.hp, maxhp: c.stats.hp, auto: true }));
+  B = { mine, foe, turn: 1, phase: "cmd", cmdIdx: 0, cmds: {}, over: false };
+  renderBattle();
+  logLine(`野生のチームが あらわれた！`, "sys");
+  nextCmd();
+}
+function brow(u, active) {
+  const d = document.createElement("div");
+  d.className = "brow" + (u.hp <= 0 ? " dead" : "") + (active ? " active" : "");
+  d.appendChild(creatureCanvas(u.genes, 52));
+  const pct = Math.max(0, Math.round(u.hp / u.maxhp * 100));
+  d.insertAdjacentHTML("beforeend", `<div class="inf"><div class="nm">${u.name}</div>
+    <div class="hp ${pct <= 30 ? "low" : ""}"><div style="width:${pct}%"></div></div>
+    <div class="hpnum">HP ${Math.max(0, u.hp)} / ${u.maxhp}</div></div>`);
+  return d;
+}
+function renderBattle() {
+  const area = $("battleArea");
+  area.innerHTML = "";
+  const foeBox = document.createElement("div"); foeBox.className = "bside";
+  B.foe.forEach(u => foeBox.appendChild(brow(u, false)));
+  area.appendChild(foeBox);
+  const vs = document.createElement("div"); vs.className = "vs"; vs.textContent = `― ターン ${B.turn} ―`;
+  area.appendChild(vs);
+  const myBox = document.createElement("div"); myBox.className = "bside";
+  B.mine.forEach((u, i) => myBox.appendChild(brow(u, B.phase === "cmd" && B.cmdIdx === i && u.hp > 0)));
+  area.appendChild(myBox);
+  const log = document.createElement("div"); log.id = "blog"; area.appendChild(log);
+  const cmds = document.createElement("div"); cmds.className = "cmds"; cmds.id = "cmds"; area.appendChild(cmds);
+  const back = document.createElement("button"); back.className = "btn sub big"; back.style.marginTop = "8px";
+  back.textContent = "🏳️ にげる（バトル終了）";
+  back.addEventListener("click", () => { B = null; show("battle"); resetBattleView(); });
+  area.appendChild(back);
+  if (B.logHtml) $("blog").innerHTML = B.logHtml;
+}
+function resetBattleView() {
+  $("battleArea").innerHTML = `<p class="desc">野生の生物チームと3対3のターン制バトル。「さくせん」で自動、「コマンド」で自分で指示できる。</p>
+    <button class="btn big" id="btnBattleStart">⚔️ バトル開始！</button>
+    <p class="note">勝つと経験値とランクポイントが手に入る。<br>てもちが0体だと戦えないよ。</p>`;
+  $("battleArea").addEventListener("click", e => { if (e.target && e.target.id === "btnBattleStart") startBattle(); });
+}
+function logLine(html, cls) {
+  if (!B) return;
+  B.logHtml = (B.logHtml || "") + `<div class="${cls || ""}">${html}</div>`;
+  const el = $("blog");
+  if (el) { el.innerHTML = B.logHtml; el.scrollTop = el.scrollHeight; }
+}
+function aliveIdx(team) { return team.map((u, i) => u.hp > 0 ? i : -1).filter(i => i >= 0); }
+function nextCmd() {
+  if (!B || B.over) return;
+  while (B.cmdIdx < B.mine.length && (B.mine[B.cmdIdx].hp <= 0 || B.mine[B.cmdIdx].auto)) {
+    if (B.mine[B.cmdIdx].hp > 0) B.cmds[B.cmdIdx] = autoCmd(B.mine[B.cmdIdx], B.foe);
+    B.cmdIdx++;
+  }
+  renderBattle();
+  if (B.cmdIdx >= B.mine.length) { execTurn(); return; }
+  const u = B.mine[B.cmdIdx];
+  const cmds = $("cmds");
+  cmds.innerHTML = "";
+  const mk = (label, fn, cls) => {
+    const b = document.createElement("button"); b.className = "btn " + (cls || ""); b.textContent = label;
+    b.addEventListener("click", fn); cmds.appendChild(b);
+  };
+  mk(`⚔️ こうげき`, () => setCmd({ type: "atk", skill: "bite" }));
+  u.skills.filter(s => s !== "bite").forEach(s => mk(`✨ ${skillById(s).nm}`, () => setCmd({ type: "skill", skill: s }), "teal"));
+  mk(`🤖 さくせん（自動）`, () => { u.auto = true; B.cmds[B.cmdIdx] = autoCmd(u, B.foe); B.cmdIdx++; nextCmd(); }, "sub");
+  logLine(`${u.name} のコマンド？`, "sys");
+}
+function setCmd(c) { B.cmds[B.cmdIdx] = c; B.cmdIdx++; nextCmd(); }
+function autoCmd(u, foes) {
+  const strong = u.skills.filter(s => skillById(s).el === u.el || skillById(s).pw >= 1.3);
+  return { type: "skill", skill: strong.length && Math.random() < 0.75 ? pick(strong) : "bite" };
+}
+function effMult(atkEl, defEl) {
+  if (atkEl < 0) return 1;
+  const c = ELCHART[atkEl];
+  return defEl === c.win ? 1.5 : defEl === c.lose ? 0.7 : 1;
+}
+function execTurn() {
+  if (!B) return;
+  B.phase = "exec";
+  B.foe.forEach((u, i) => { if (u.hp > 0) B.cmds["f" + i] = autoCmd(u, B.mine); });
+  const order = [];
+  B.mine.forEach((u, i) => { if (u.hp > 0) order.push({ u, cmd: B.cmds[i], foes: B.foe }); });
+  B.foe.forEach((u, i) => { if (u.hp > 0) order.push({ u, cmd: B.cmds["f" + i], foes: B.mine }); });
+  order.sort((a, b) => b.u.stats.spd - a.u.stats.spd);
+  let delay = 350;
+  for (const act of order) {
+    setTimeout(() => doAction(act), delay);
+    delay += 620;
+  }
+  setTimeout(endTurn, delay + 150);
+}
+function doAction(act) {
+  if (!B || B.over) return;
+  const { u, cmd, foes } = act;
+  if (u.hp <= 0) return;
+  const targets = foes.filter(t => t.hp > 0);
+  if (!targets.length) return;
+  const t = targets.reduce((m, x) => x.hp < m.hp ? x : m, targets[0]); // 一番弱っている相手を狙う
+  const sk = skillById(cmd.skill || "bite");
+  const m = effMult(sk.el, t.el);
+  const dmg = Math.max(1, Math.round(u.stats.atk * sk.pw * m * rnd(0.85, 1.15) * 22 / (t.stats.def + 18)));
+  t.hp -= dmg;
+  logLine(`${u.name} の ${sk.nm}！ ${t.name} に <span class="dmg">${dmg} ダメージ</span>${m > 1 ? "（効果ばつぐん！）" : m < 1 ? "（いまひとつ）" : ""}`);
+  if (t.hp <= 0) logLine(`${t.name} は たおれた！`, "good");
+  renderBattle();
+  se("hit");
+  const sides = document.querySelectorAll("#battleArea .bside");
+  const hitRow = sides[foes === B.foe ? 0 : 1] && sides[foes === B.foe ? 0 : 1].children[foes.indexOf(t)];
+  if (hitRow) {
+    hitRow.classList.add("hit");
+    const pop = document.createElement("span");
+    pop.className = "dmgpop"; pop.textContent = dmg;
+    hitRow.appendChild(pop);
+    setTimeout(() => pop.remove(), 900);
+  }
+  checkEnd();
+}
+function checkEnd() {
+  if (!B || B.over) return false;
+  const mw = aliveIdx(B.mine).length, fw = aliveIdx(B.foe).length;
+  if (fw && mw) return false;
+  B.over = true;
+  if (mw) {
+    S.rankPt += 10;
+    const ups = [];
+    for (const u of B.mine) { if (gainExp(u.ref, 34)) ups.push(`${u.ref.name} Lv${u.ref.lv}！`); }
+    save(); renderHeader();
+    logLine(`🎉 勝利！経験値+34／ランクポイント+10 ${ups.join(" ")}`, "good");
+    setTimeout(() => { openModal(`<h3>🎉 バトル勝利！</h3><p style="font-size:14px;line-height:1.8;">経験値とランクポイントをゲット！<br>現在ランク：<b>${rankName()}</b>（${S.rankPt}pt）<br>${ups.length ? "レベルアップ：" + ups.join("、") : "レベルアップまであと少し！"}</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">よっしゃ！</button>`); }, 700);
+  } else {
+    for (const u of B.mine) gainExp(u.ref, 10);
+    save();
+    logLine(`💦 全滅…。てもちは回復した（試作版） 経験値+10`, "sys");
+    setTimeout(() => { openModal(`<h3>💦 まけちゃった…</h3><p style="font-size:14px;line-height:1.8;">てもちは全回復したよ（試作版の優しさ）。<br>交配で強い子を作って再挑戦しよう！</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">つぎがんばる</button>`); }, 700);
+  }
+  return true;
+}
+function endTurn() {
+  if (!B || B.over) return;
+  if (checkEnd()) return;
+  B.turn++; B.cmdIdx = 0; B.cmds = {}; B.phase = "cmd";
+  nextCmd();
+}
+$("btnBattleStart").addEventListener("click", startBattle);
+
+/* ============ 初期化 ============ */
+window.__kaseki = { get S() { return S; }, rollRock, startClean, autoClean, reviveParts, breedCreatures, reviveFromFossil, startBattle, effStats, setBL(v) { BL = v; } };
+$("muteBtn").textContent = S.mute ? "🔇" : "🔊";
+$("muteBtn").addEventListener("click", () => {
+  S.mute = !S.mute; save();
+  $("muteBtn").textContent = S.mute ? "🔇" : "🔊";
+  if (!S.mute) se("sparkle");
+});
+renderHeader();
+renderHome();
+save();
+</script>
+</body>
+</html>
