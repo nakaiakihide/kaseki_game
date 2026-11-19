@@ -1,0 +1,2067 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>カセキ遺伝子組み換えバトル 試作v16</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; }
+  body {
+    font-family:"Hiragino Maru Gothic ProN","Hiragino Sans","Noto Sans JP",sans-serif;
+    background:#2b2118; color:#2b2118; overflow:hidden;
+    display:flex; justify-content:center;
+  }
+  #app {
+    width:100%; max-width:480px; height:100dvh; background:#f7ead2;
+    display:flex; flex-direction:column; position:relative;
+    background-image:radial-gradient(#e8d5ae 1px, transparent 1px);
+    background-size:22px 22px;
+  }
+  header {
+    background:linear-gradient(180deg,#8a5a2b,#6f4520); color:#ffe9bd;
+    padding:10px 14px 8px; display:flex; align-items:center; gap:8px;
+    box-shadow:0 2px 6px rgba(0,0,0,.35); z-index:5;
+  }
+  header .logo { font-size:20px; font-weight:900; letter-spacing:1px; text-shadow:0 2px 0 #4c2f12; }
+  header .logo small { font-size:11px; color:#ffd98a; }
+  header .stats { margin-left:auto; font-size:12px; text-align:right; line-height:1.5; }
+  header .stats b { color:#fff; font-size:14px; }
+  main { flex:1; overflow-y:auto; padding:12px 12px 84px; }
+  .view { display:none; }
+  .view.on { display:block; animation:fadein .18s ease; }
+  @keyframes fadein { from { opacity:0; transform:translateY(4px);} to { opacity:1; } }
+  h2 { font-size:17px; margin:2px 0 8px; color:#6f4520; }
+  p.desc { font-size:13px; color:#7a6748; margin-bottom:10px; line-height:1.6; }
+  /* 発掘グリッド */
+  #digGrid { display:grid; grid-template-columns:repeat(5,1fr); gap:7px; }
+  .tile {
+    aspect-ratio:1; border:none; border-radius:10px; font-size:26px; cursor:pointer;
+    background:linear-gradient(145deg,#a9743f,#8a5a2b); color:#fff;
+    box-shadow:0 3px 0 #5d3a17, inset 0 2px 3px rgba(255,255,255,.35);
+    transition:transform .06s;
+  }
+  .tile:active { transform:scale(.93); }
+  .tile.c1 { background:linear-gradient(145deg,#96682f,#75501f); }
+  .tile.open { background:#e5cf9f; box-shadow:inset 0 2px 6px rgba(90,60,20,.45); font-size:20px; }
+  .tile.fossil { background:radial-gradient(circle at 50% 40%,#fff3cf,#e8cf92); box-shadow:0 0 0 3px #ffb52e, inset 0 2px 6px rgba(90,60,20,.3); }
+  /* ボタン */
+  .btn {
+    display:inline-block; border:none; cursor:pointer; font-family:inherit; font-weight:800;
+    background:linear-gradient(180deg,#ffb52e,#f59e0b); color:#4c2f12;
+    padding:11px 18px; border-radius:999px; font-size:15px;
+    box-shadow:0 3px 0 #b45309; transition:transform .06s;
+  }
+  .btn:active { transform:translateY(2px); box-shadow:0 1px 0 #b45309; }
+  .btn.sub { background:linear-gradient(180deg,#fdf6e3,#efe0bd); box-shadow:0 3px 0 #c9ab72; color:#6f4520; }
+  .btn.teal { background:linear-gradient(180deg,#2dd4bf,#0d9488); color:#fff; box-shadow:0 3px 0 #0f766e; }
+  .btn:disabled { opacity:.45; pointer-events:none; }
+  .btn.big { width:100%; font-size:17px; padding:14px; }
+  /* カード */
+  .card {
+    background:#fffdf6; border:2px solid #e3cf9e; border-radius:14px; padding:10px;
+    box-shadow:0 2px 5px rgba(111,69,32,.12);
+  }
+  .creature { display:flex; gap:10px; align-items:center; }
+  .creature canvas { border-radius:10px; background:linear-gradient(180deg,#bfe8ff,#eafbe7); flex:none; }
+  .creature .nm { font-weight:900; font-size:16px; }
+  .creature .meta { font-size:12px; color:#7a6748; line-height:1.55; }
+  .chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:3px; }
+  .chip { font-size:11px; background:#f3e5c3; border-radius:999px; padding:2px 8px; color:#6f4520; font-weight:700; }
+  .chip.el { background:#ffe1a8; }
+  .list { display:flex; flex-direction:column; gap:9px; }
+  .sel { outline:3px solid #f59e0b; }
+  /* クリーニング */
+  #cleanWrap { position:relative; width:100%; max-width:340px; margin:0 auto; }
+  #cleanCv { width:100%; border-radius:14px; touch-action:none; background:#d9c08d; box-shadow:inset 0 0 0 3px #b98d4f; }
+  .gauge { height:16px; background:#e8dcc0; border-radius:999px; overflow:hidden; margin:10px 0; border:2px solid #cbb27f; }
+  .gauge > div { height:100%; width:0%; background:linear-gradient(90deg,#2dd4bf,#0d9488); transition:width .15s; }
+  /* バトル */
+  .bside { display:flex; flex-direction:column; gap:7px; margin-bottom:8px; }
+  .brow { display:flex; align-items:center; gap:8px; background:#fffdf6; border:2px solid #e3cf9e; border-radius:12px; padding:5px 8px; }
+  .brow.dead { opacity:.38; filter:grayscale(1); }
+  .brow.active { outline:3px solid #f59e0b; }
+  .brow canvas { border-radius:8px; background:linear-gradient(180deg,#ffe9c9,#fff6e0); flex:none; }
+  .brow .inf { flex:1; min-width:0; }
+  .brow .nm { font-weight:900; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .hp { height:9px; background:#eadfc6; border-radius:99px; overflow:hidden; margin-top:3px; }
+  .hp > div { height:100%; background:linear-gradient(90deg,#4ade80,#22c55e); transition:width .35s; }
+  .hp.low > div { background:linear-gradient(90deg,#f87171,#ef4444); }
+  .hp .hpnum { font-size:11px; }
+  .hpnum { font-size:11px; color:#7a6748; }
+  #blog {
+    background:#33241a; color:#ffe9bd; border-radius:12px; padding:10px 12px;
+    font-size:13px; line-height:1.65; height:132px; overflow-y:auto; margin:8px 0;
+  }
+  #blog .dmg { color:#fca5a5; } #blog .good { color:#86efac; } #blog .sys { color:#93c5fd; }
+  .cmds { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  /* タブバー */
+  nav {
+    position:absolute; left:0; right:0; bottom:0; display:flex; z-index:6;
+    background:#fffdf6; border-top:2px solid #e3cf9e; box-shadow:0 -3px 8px rgba(111,69,32,.15);
+  }
+  nav button {
+    flex:1; border:none; background:none; font-family:inherit; cursor:pointer;
+    padding:8px 0 10px; font-size:11px; font-weight:800; color:#a0865c;
+    display:flex; flex-direction:column; align-items:center; gap:1px;
+  }
+  nav button .ic { font-size:21px; }
+  nav button.on { color:#b45309; }
+  nav button.on .ic { transform:scale(1.15); }
+  /* モーダル */
+  #modal {
+    position:absolute; inset:0; background:rgba(43,28,10,.55); z-index:20;
+    display:none; align-items:center; justify-content:center; padding:18px;
+  }
+  #modal.on { display:flex; }
+  #modal .box {
+    background:#fffdf6; border-radius:18px; padding:18px 16px; width:100%; max-width:400px;
+    text-align:center; animation:pop .22s ease; max-height:88dvh; overflow-y:auto;
+  }
+  @keyframes pop { from { transform:scale(.85); opacity:0;} to { transform:scale(1); opacity:1;} }
+  #modal h3 { font-size:19px; margin-bottom:6px; color:#6f4520; }
+  #modal .box canvas { border-radius:12px; background:linear-gradient(180deg,#bfe8ff,#eafbe7); }
+  .grade { font-size:34px; font-weight:900; color:#f59e0b; text-shadow:0 2px 0 #b45309; }
+  .dexgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .dexcell { background:#fffdf6; border:2px solid #e3cf9e; border-radius:12px; padding:6px 4px; text-align:center; }
+  .dexcell canvas { border-radius:8px; background:linear-gradient(180deg,#bfe8ff,#eafbe7); }
+  .dexcell .nm { font-size:11px; font-weight:800; margin-top:3px; line-height:1.3; }
+  .dexcell .ct { font-size:10px; color:#a0865c; }
+  /* 発掘v2 */
+  .tools { display:flex; gap:7px; margin-bottom:9px; }
+  .tool {
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:0;
+    padding:8px 2px 7px; font-size:14px; border-radius:12px;
+  }
+  .tool small { font-size:10px; font-weight:600; color:#a0865c; }
+  .tool.on { outline:3px solid #f59e0b; background:linear-gradient(180deg,#fff3cf,#ffe9a8); }
+  .tile.cracked {
+    background:
+      linear-gradient(115deg, transparent 45%, rgba(43,25,5,.6) 46.5%, transparent 48.5%),
+      linear-gradient(30deg, transparent 62%, rgba(43,25,5,.5) 63.5%, transparent 65.5%),
+      linear-gradient(160deg, transparent 70%, rgba(43,25,5,.45) 71.5%, transparent 73.5%),
+      linear-gradient(145deg,#a9743f,#8a5a2b);
+  }
+  .tile.hard { background:linear-gradient(145deg,#7d6248,#5f4630); }
+  .tile.hard.cracked {
+    background:
+      linear-gradient(115deg, transparent 45%, rgba(20,10,0,.65) 46.5%, transparent 48.5%),
+      linear-gradient(30deg, transparent 62%, rgba(20,10,0,.55) 63.5%, transparent 65.5%),
+      linear-gradient(145deg,#7d6248,#5f4630);
+  }
+  .tile.ping { animation:ping 0.45s ease 3; }
+  @keyframes ping { 0%,100% { box-shadow:0 3px 0 #5d3a17; } 50% { box-shadow:0 0 0 6px #38bdf8, 0 3px 0 #5d3a17; transform:scale(1.07); } }
+  @keyframes shake { 0%,100% { transform:translateX(0); } 25% { transform:translateX(-4px); } 75% { transform:translateX(4px); } }
+  .shake { animation:shake .18s ease; }
+  .tile.treasure { background:radial-gradient(circle at 50% 40%,#e0f7ff,#a8dcf0); box-shadow:inset 0 2px 6px rgba(30,80,110,.4); }
+  .gauge.dmg > div { background:linear-gradient(90deg,#fbbf24,#ef4444); }
+  #timeGauge { background:linear-gradient(90deg,#f59e0b,#f97316); }
+  #cleanDmgGauge { background:linear-gradient(90deg,#4ade80,#22c55e); }
+  /* v4 演出 */
+  .tile { position:relative; }
+  .bit {
+    position:absolute; left:50%; top:50%; width:7px; height:7px; border-radius:2px;
+    pointer-events:none; z-index:4; animation:bitfly .5s ease-out forwards;
+  }
+  @keyframes bitfly { to { transform:translate(var(--dx), var(--dy)) rotate(160deg); opacity:0; } }
+  .brow { position:relative; }
+  .brow.hit { animation:hitshake .32s ease; }
+  @keyframes hitshake { 0%,100% { transform:translateX(0); } 20% { transform:translateX(-5px); background:#ffe1e1; } 45% { transform:translateX(4px); } 70% { transform:translateX(-2px); } }
+  .dmgpop {
+    position:absolute; right:10px; top:2px; font-weight:900; color:#dc2626; font-size:17px;
+    animation:dmgup .85s ease forwards; pointer-events:none; text-shadow:0 1px 0 #fff; z-index:3;
+  }
+  @keyframes dmgup { 0% { transform:translateY(5px); opacity:0; } 18% { opacity:1; } 100% { transform:translateY(-20px); opacity:0; } }
+  #cursorRing {
+    position:absolute; border:2px solid rgba(13,148,136,.8); border-radius:50%;
+    pointer-events:none; display:none; transform:translate(-50%,-50%); z-index:5;
+    box-shadow:0 0 0 1px rgba(255,255,255,.5) inset;
+  }
+  .card.gold { border-color:#f59e0b; box-shadow:0 0 0 2px #fbbf24, 0 2px 10px rgba(245,158,11,.4); }
+  .card.silver { border-color:#b8c2cc; box-shadow:0 0 0 1px #d5dde5, 0 2px 5px rgba(111,69,32,.12); }
+  #muteBtn { background:none; border:none; font-size:19px; cursor:pointer; padding:2px; }
+  /* v5 オリジナル演出 */
+  .mascotRow { display:flex; gap:9px; align-items:center; margin-bottom:9px; }
+  #mascotCv { flex:none; border-radius:50%; background:linear-gradient(180deg,#ffe9c9,#fff6e0); box-shadow:inset 0 0 0 2px #e3cf9e; }
+  .bubble {
+    position:relative; flex:1; background:#fff; border:2px solid #e3cf9e; border-radius:12px;
+    padding:7px 10px; font-size:12.5px; line-height:1.5; font-weight:700; color:#6f4520;
+    min-height:44px; display:flex; align-items:center;
+  }
+  .bubble::before { content:""; position:absolute; left:-8px; top:50%; margin-top:-6px; border:6px solid transparent; border-right-color:#e3cf9e; border-left:0; }
+  .progBox { flex:none; width:58px; text-align:center; }
+  .progBar { height:7px; background:#e8dcc0; border-radius:99px; overflow:hidden; margin-top:3px; }
+  #progFill { height:100%; width:0%; background:linear-gradient(90deg,#2dd4bf,#0d9488); transition:width .3s; }
+  .progPct { font-size:10px; color:#a0865c; font-weight:700; margin-top:2px; }
+  #progCvWrap canvas { border-radius:8px; background:linear-gradient(180deg,#bfe8ff,#eafbe7); }
+  #goodPop {
+    position:absolute; left:50%; top:15%; transform:translateX(-50%); font-size:30px; font-weight:900;
+    color:#f59e0b; text-shadow:0 2px 0 #fff, 0 4px 8px rgba(0,0,0,.25); opacity:0; pointer-events:none; z-index:6;
+  }
+  #goodPop.show { animation:goodpop .8s ease forwards; }
+  @keyframes goodpop { 0% { opacity:0; transform:translateX(-50%) scale(.6); } 25% { opacity:1; transform:translateX(-50%) scale(1.15); } 45% { transform:translateX(-50%) scale(1); } 100% { opacity:0; transform:translateX(-50%) translateY(-14px); } }
+  #cleanWrap {
+    background:linear-gradient(145deg,#9c6b32,#7c5223); padding:9px; border-radius:16px;
+    box-shadow:inset 0 2px 4px rgba(255,255,255,.35), inset 0 -3px 6px rgba(0,0,0,.3), 0 3px 8px rgba(111,69,32,.3);
+  }
+  /* v7 1画面に収める（ページスクロール禁止） */
+  main { flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; padding:10px 12px; }
+  nav { position:static; flex:none; }
+  .view.on { display:flex; flex-direction:column; height:100%; min-height:0; }
+  h2 { margin:0 0 4px; }
+  p.desc { margin-bottom:7px; }
+  #digArea { flex:1; min-height:0; display:flex; }
+  #digGrid { flex:1; grid-template-rows:repeat(6, 1fr); }
+  .tile { aspect-ratio:auto; height:auto; font-size:clamp(15px, 5.2vmin, 26px); }
+  #cleanWrap { width:min(340px, 100%, max(150px, calc(100dvh - 552px))); flex:none; }
+  #mascotCv { width:52px; height:52px; }
+  #v-clean .btn { flex:none; }
+  #v-clean .btn.big { padding:11px; }
+  #v-clean .tool { padding:6px 2px 5px; }
+  #cleanInfo { margin:4px 0 6px; }
+  @media (max-height: 720px) {
+    #v-clean .desc { display:none; }
+    #btnCleanRetry { display:none; }
+    #mascotCv { width:40px; height:40px; }
+    .bubble { min-height:0; font-size:11.5px; padding:5px 8px; }
+    .progBox { width:46px; }
+  }
+  #btnCleanRetry { padding:8px; font-size:13px; margin-top:6px; }
+  #cleanCv { width:100%; height:auto; display:block; }
+  #battleArea { display:flex; flex-direction:column; flex:1; min-height:0; }
+  #blog { flex:1; min-height:54px; height:auto; }
+  .list { overflow-y:auto; min-height:0; flex:1; padding-bottom:4px; }
+  .dexgrid { overflow-y:auto; min-height:0; flex:1; align-content:start; padding-bottom:4px; }
+  header .logo { white-space:nowrap; font-size:17px; }
+  header .stats { white-space:nowrap; }
+  /* v8 クリーニング集中モード */
+  #app.focus header, #app.focus nav { display:none; }
+  #app.focus main { padding:8px 10px; }
+  #app.focus #v-clean h2, #app.focus #v-clean .desc { display:none; }
+  #app.focus #cleanWrap { max-width:372px; width:min(372px, 100%, calc(100dvh - 292px)); }
+  #app.focus #mascotCv { width:44px; height:44px; }
+  #app.focus #btnCleanRetry { display:block; }
+  /* v9 デザイン刷新 */
+  #app { background:linear-gradient(180deg,#faF0da,#f3e2bd); }
+  #app::after {
+    content:""; position:absolute; inset:0; pointer-events:none; z-index:50;
+    background:radial-gradient(ellipse at 50% 42%, transparent 58%, rgba(90,60,20,.13));
+  }
+  header {
+    background:linear-gradient(180deg,#9a652f,#7a4e21);
+    border-bottom:3px solid #5d3a17;
+    box-shadow:0 3px 8px rgba(60,35,5,.35), inset 0 1px 0 rgba(255,255,255,.25);
+  }
+  .logoBadge {
+    display:inline-block; background:linear-gradient(180deg,#ffc44d,#f59e0b);
+    border-radius:9px; padding:0 5px; margin-right:2px;
+    box-shadow:0 2px 0 #b45309, inset 0 1px 0 rgba(255,255,255,.6);
+  }
+  h2 { text-shadow:0 1px 0 rgba(255,255,255,.7); letter-spacing:.5px; }
+  #digArea {
+    background:linear-gradient(180deg, rgba(169,116,63,.14), rgba(169,116,63,.22));
+    border-radius:14px; padding:6px; box-shadow:inset 0 2px 6px rgba(90,60,20,.18);
+  }
+  .tile {
+    border-radius:12px;
+    background:
+      radial-gradient(circle at 30% 22%, rgba(255,255,255,.30), transparent 45%),
+      repeating-linear-gradient(178deg, transparent 0 9px, rgba(70,42,12,.12) 9px 10px),
+      linear-gradient(160deg,#b3814a,#96682f);
+    box-shadow:0 3px 0 #5d3a17, inset 0 2px 3px rgba(255,255,255,.35), inset 0 -6px 9px rgba(70,42,12,.35);
+  }
+  .tile.hard {
+    background:
+      radial-gradient(circle at 30% 22%, rgba(255,255,255,.18), transparent 45%),
+      repeating-linear-gradient(178deg, transparent 0 8px, rgba(20,12,4,.16) 8px 9px),
+      linear-gradient(160deg,#77644c,#57432c);
+  }
+  .tile.cracked {
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cpath d='M10 2 L24 20 L17 31 L32 46 M24 20 L40 25 M32 46 L29 58' stroke='rgba(43,25,5,.5)' stroke-width='2.2' fill='none'/%3E%3C/svg%3E"),
+      radial-gradient(circle at 30% 22%, rgba(255,255,255,.26), transparent 45%),
+      repeating-linear-gradient(178deg, transparent 0 9px, rgba(70,42,12,.12) 9px 10px),
+      linear-gradient(160deg,#ad7a42,#8a5a2b);
+    background-size:cover, auto, auto, auto;
+  }
+  .tile.hard.cracked {
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cpath d='M10 2 L24 20 L17 31 L32 46 M24 20 L40 25 M32 46 L29 58' stroke='rgba(15,8,2,.6)' stroke-width='2.2' fill='none'/%3E%3C/svg%3E"),
+      radial-gradient(circle at 30% 22%, rgba(255,255,255,.15), transparent 45%),
+      linear-gradient(160deg,#6f5b45,#4e3a24);
+    background-size:cover, auto, auto;
+  }
+  .tile.open {
+    background:radial-gradient(ellipse at 50% 42%, #f0deb0, #dec48f);
+    box-shadow:inset 0 3px 9px rgba(90,60,20,.5), inset 0 -2px 4px rgba(255,255,255,.4);
+  }
+  .tile.fossil {
+    background:radial-gradient(circle at 50% 38%, #fff6d8, #f3d98b);
+    animation:fossilGlow 1.6s ease-in-out infinite;
+  }
+  @keyframes fossilGlow {
+    0%,100% { box-shadow:0 0 0 3px #ffb52e, 0 0 12px rgba(255,181,46,.55), inset 0 2px 6px rgba(90,60,20,.3); }
+    50% { box-shadow:0 0 0 3px #ffb52e, 0 0 24px rgba(255,181,46,.95), inset 0 2px 6px rgba(90,60,20,.3); }
+  }
+  .tile.treasure { animation:twinkle 1.3s ease-in-out infinite; }
+  @keyframes twinkle { 0%,100% { filter:brightness(1); } 50% { filter:brightness(1.22); } }
+  .btn { box-shadow:0 3px 0 #b45309, inset 0 1px 0 rgba(255,255,255,.55); }
+  .btn.teal { box-shadow:0 3px 0 #0f766e, inset 0 1px 0 rgba(255,255,255,.45); }
+  .btn.sub { box-shadow:0 3px 0 #c9ab72, inset 0 1px 0 rgba(255,255,255,.7); }
+  .tool { box-shadow:0 2px 0 #c9ab72, inset 0 1px 0 #fff; }
+  nav button { margin:4px 3px; border-radius:12px; }
+  nav button.on { background:linear-gradient(180deg,#fff3cf,#ffe9a8); box-shadow:inset 0 0 0 2px #f5c04e; }
+  .card {
+    background:linear-gradient(180deg,#fffef9,#fdf6e0);
+    box-shadow:0 3px 8px rgba(111,69,32,.13), inset 0 1px 0 #fff;
+    border-radius:16px;
+  }
+  .creature canvas { box-shadow:inset 0 0 0 2px rgba(255,255,255,.65), 0 2px 5px rgba(90,60,20,.2); }
+  .sbar { display:flex; align-items:center; gap:5px; font-size:10.5px; margin-top:2px; }
+  .sbar span { width:45px; color:#a0865c; font-weight:700; flex:none; white-space:nowrap; font-size:10px; }
+  header .stats { flex:none; font-size:11px; line-height:1.45; }
+  .brow { padding:4px 7px; gap:7px; }
+  .brow canvas { width:46px !important; height:46px !important; }
+  .bside { gap:5px; }
+  #battleArea .bside { padding:4px; }
+  #blog { min-height:24px; }
+  .sbar b { width:24px; text-align:right; flex:none; color:#6f4520; }
+  .strack { flex:1; height:6px; background:#eadfc6; border-radius:99px; overflow:hidden; box-shadow:inset 0 1px 2px rgba(90,60,20,.25); }
+  .strack > div { height:100%; border-radius:99px; background-image:linear-gradient(180deg, rgba(255,255,255,.5), transparent 60%); }
+  .gauge { box-shadow:inset 0 1px 3px rgba(90,60,20,.35); }
+  .gauge > div { background-image:linear-gradient(180deg, rgba(255,255,255,.45), transparent 55%); }
+  #battleArea .bside { background:linear-gradient(180deg, rgba(168,216,234,.30), rgba(214,240,205,.30)); border-radius:14px; padding:6px; }
+  #battleArea .bside:first-child { background:linear-gradient(180deg, rgba(244,194,160,.35), rgba(250,230,200,.30)); }
+  .brow { box-shadow:0 2px 4px rgba(111,69,32,.10); }
+  .hp > div { background-image:linear-gradient(180deg, rgba(255,255,255,.5), transparent 55%), linear-gradient(90deg,#4ade80,#22c55e); }
+  .hp.low > div { background-image:linear-gradient(180deg, rgba(255,255,255,.5), transparent 55%), linear-gradient(90deg,#f87171,#ef4444); }
+  #modal { backdrop-filter:blur(2px); }
+  #modal .box { border:3px solid #e7d29c; box-shadow:0 14px 34px rgba(43,28,10,.45); }
+  .bubble { box-shadow:0 2px 5px rgba(111,69,32,.12); }
+  #cleanWrap {
+    background:
+      radial-gradient(circle 5px at 13px 13px, #54370f 3.5px, #d8b878 4.5px, transparent 5.5px),
+      radial-gradient(circle 5px at calc(100% - 13px) 13px, #54370f 3.5px, #d8b878 4.5px, transparent 5.5px),
+      radial-gradient(circle 5px at 13px calc(100% - 13px), #54370f 3.5px, #d8b878 4.5px, transparent 5.5px),
+      radial-gradient(circle 5px at calc(100% - 13px) calc(100% - 13px), #54370f 3.5px, #d8b878 4.5px, transparent 5.5px),
+      linear-gradient(145deg,#a06c33,#7c5223);
+  }
+  @media (max-height:720px) {
+    #v-battle h2 { display:none; }
+    #v-battle .brow { padding:3px 6px; gap:6px; }
+    #v-battle .brow canvas { width:36px !important; height:36px !important; }
+    #v-battle .brow .nm { font-size:12.5px; }
+    #v-battle .brow .hpnum { font-size:10.5px; }
+    #v-battle .vs { font-size:12.5px; margin:1px 0; }
+    #v-battle #blog { min-height:20px; font-size:12.5px; padding:6px 8px; }
+    #v-battle .cmds { grid-template-columns:repeat(4,1fr); gap:5px; }
+    #v-battle .cmds .btn { padding:8px 2px; font-size:12px; }
+    #v-battle #battleArea > .btn { padding:6px; font-size:13px; margin-top:3px !important; }
+    #v-battle .bside { gap:4px; padding:3px; }
+    #v-battle .brow .hp { margin:2px 0 1px; }
+  }
+  .cleanBtns { display:flex; gap:8px; }
+  #v-clean .cleanBtns .btn { flex:1 1 0%; }
+  .cleanBtns #btnCleanRetry { margin-top:0; }
+  .vs { text-align:center; font-weight:900; color:#b45309; margin:2px 0; }
+  /* v10 新仕様 */
+  .rockIc { font-size:40px; line-height:1; flex:none; width:56px; text-align:center; }
+  .rockCard .autoRow { display:flex; gap:5px; margin-top:7px; flex-wrap:wrap; }
+  .rockCard .autoRow .btn { flex:1; padding:7px 2px; font-size:11.5px; white-space:nowrap; }
+  .partRow { display:flex; align-items:center; gap:6px; padding:7px 9px; }
+  .partRow .pchip { font-size:10.5px; padding:2px 6px; border-radius:99px; background:#eadfc6; color:#a0865c; font-weight:700; white-space:nowrap; }
+  .partRow .pchip.got { background:#d9f99d; color:#4d7c0f; }
+  .partRow .pchip.gS { background:#fde68a; color:#92400e; }
+  .expbar { height:5px; background:#eadfc6; border-radius:99px; overflow:hidden; margin-top:3px; }
+  .expbar > div { height:100%; background:linear-gradient(90deg,#38bdf8,#818cf8); }
+  .lockRow { display:flex; gap:5px; flex-wrap:wrap; margin-top:8px; }
+  .lockRow .btn { flex:1; padding:7px 2px; font-size:11.5px; white-space:nowrap; }
+  .lockRow .btn.on { background:linear-gradient(180deg,#fbbf24,#f59e0b); color:#fff; box-shadow:0 3px 0 #b45309; }
+  #v-rock.on { display:block; overflow-y:auto; }
+  #v-rock .list { flex:none; overflow:visible; }
+  #hdrStats { font-size:10.5px; white-space:nowrap; line-height:1.5; }
+  header { overflow:hidden; }
+  header .logo { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+  #muteBtn { flex:none; }
+  /* v12 演出 */
+  #fx { position:absolute; inset:0; z-index:30; display:none; align-items:center; justify-content:center; flex-direction:column; background:radial-gradient(ellipse at 50% 38%, rgba(70,45,15,.88), rgba(25,15,5,.96)); overflow:hidden; }
+  #fx.on { display:flex; }
+  #fx .rays { position:absolute; width:560px; height:560px; left:50%; top:36%; transform:translate(-50%,-50%); border-radius:50%; opacity:0; pointer-events:none; }
+  #fx .rays.r1 { background:repeating-conic-gradient(rgba(255,215,120,.20) 0 12deg, transparent 12deg 24deg); animation:raySpin 7s linear infinite; opacity:1; }
+  #fx .rays.r2 { background:repeating-conic-gradient(rgba(255,120,220,.22) 0 10deg, rgba(120,200,255,.22) 10deg 20deg, rgba(255,235,140,.22) 20deg 30deg, transparent 30deg 40deg); animation:raySpin 5s linear infinite; opacity:1; }
+  @keyframes raySpin { to { transform:translate(-50%,-50%) rotate(360deg); } }
+  #fx .fxRock { font-size:118px; line-height:1.1; position:relative; z-index:2; filter:drop-shadow(0 14px 22px rgba(0,0,0,.5)); }
+  #fx .fxRock.shake { animation:fxShake .45s ease-in-out infinite; }
+  #fx .fxRock.drop { animation:fxDrop .45s cubic-bezier(.2,1.6,.4,1) both; }
+  #fx .fxRock.glow1 { filter:drop-shadow(0 0 26px rgba(255,220,130,.95)) drop-shadow(0 14px 22px rgba(0,0,0,.5)); }
+  #fx .fxRock.glow2 { filter:drop-shadow(0 0 34px rgba(255,160,230,.95)) drop-shadow(0 0 60px rgba(140,200,255,.8)) drop-shadow(0 14px 22px rgba(0,0,0,.5)); }
+  @keyframes fxShake { 0%,100% { transform:translateX(0) rotate(0); } 25% { transform:translateX(-7px) rotate(-4deg); } 75% { transform:translateX(7px) rotate(4deg); } }
+  @keyframes fxDrop { 0% { transform:translateY(-190px) scale(.7); opacity:0; } 60% { opacity:1; } 100% { transform:translateY(0) scale(1); opacity:1; } }
+  #fx .flash { position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:3; }
+  #fx .flash.go { animation:fxFlash .38s ease-out; }
+  @keyframes fxFlash { 0% { opacity:0; } 25% { opacity:.9; } 100% { opacity:0; } }
+  #fx .spark { position:absolute; width:9px; height:9px; border-radius:50%; z-index:2; pointer-events:none; animation:sparkFly .8s ease-out forwards; }
+  @keyframes sparkFly { to { transform:translate(var(--dx), var(--dy)) scale(.3); opacity:0; } }
+  #fx .fxTitle { color:#ffe9bd; font-weight:900; font-size:21px; margin-top:16px; text-shadow:0 2px 0 #4c2f12; opacity:0; z-index:2; text-align:center; padding:0 20px; }
+  #fx .fxSub { color:#e8d5ae; font-size:13px; margin-top:5px; opacity:0; z-index:2; text-align:center; padding:0 26px; line-height:1.6; }
+  #fx .showT { animation:fxUp .35s ease both; }
+  @keyframes fxUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+  #fx .fxBtn { margin-top:18px; z-index:2; opacity:0; pointer-events:none; min-width:170px; }
+  #fx .fxBtn.showT { pointer-events:auto; }
+  #fx .fxStage { position:relative; z-index:2; width:230px; height:230px; display:flex; align-items:center; justify-content:center; }
+  #fx .fxStage canvas { position:absolute; }
+  #fx .fxStage .sil { animation:fxShake .4s ease-in-out infinite; }
+  #fx .fxStage .real { opacity:0; }
+  #fx .fxStage .real.pop { animation:fxPop .5s cubic-bezier(.2,1.8,.4,1) both; }
+  @keyframes fxPop { from { opacity:0; transform:scale(.5); } to { opacity:1; transform:scale(1); } }
+  #fx .hint { position:absolute; bottom:20px; color:rgba(255,233,189,.65); font-size:11.5px; z-index:2; }
+  /* v13 ホーム画面 */
+  nav button { font-size:10px; letter-spacing:0; white-space:nowrap; }
+  .homeStage { display:grid; grid-template-columns:27% 1fr 27%; gap:7px; align-items:center; margin:4px 0 12px; }
+  .homeCenter { text-align:center; min-width:0; }
+  .homeCenter canvas { max-width:44vw; height:auto; }
+  .homeCharName { font-size:13.5px; margin-top:2px; line-height:1.5; }
+  .bob { animation:bobY 2.6s ease-in-out infinite; }
+  @keyframes bobY { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-7px); } }
+  .sideCard { background:linear-gradient(180deg,#fff8ea,#ffedb8); border:2px solid #e7cf9a; border-radius:14px; padding:9px 8px; box-shadow:0 3px 0 rgba(160,120,50,.35); }
+  .sideTtl { font-weight:900; font-size:12.5px; color:#b45309; margin-bottom:4px; }
+  .sideTxt { font-size:10.5px; line-height:1.6; color:#6d5836; }
+  .sideNote { color:#b08d4f; font-size:10px; }
+  .sideBtn { width:100%; padding:10px 2px; font-size:12px; line-height:1.45; margin-bottom:8px; }
+  /* v14 モンスト風ホーム */
+  .hud { display:flex; align-items:center; gap:8px; background:linear-gradient(180deg,#3a2c18,#57431f); border-radius:14px; padding:8px 10px; color:#ffe9bd; box-shadow:0 3px 0 rgba(90,60,20,.4); }
+  .hudLeft { flex:1; min-width:0; }
+  .hudTitle { font-size:10px; color:#fbbf24; font-weight:700; }
+  .hudName { font-size:16px; font-weight:900; line-height:1.15; }
+  .stamRow { display:flex; align-items:center; gap:5px; margin-top:3px; }
+  .stamLbl { font-size:9.5px; font-weight:700; white-space:nowrap; }
+  .stamBar { flex:1; height:11px; background:#241a0c; border-radius:6px; overflow:hidden; border:1px solid rgba(255,233,189,.35); }
+  .stamFill { height:100%; background:linear-gradient(90deg,#fb923c,#f97316); width:100%; transition:width .4s; }
+  .stamNum { font-size:10.5px; font-weight:800; white-space:nowrap; }
+  .hudRank { flex:none; width:72px; height:72px; border-radius:50%; background:radial-gradient(circle at 50% 32%, #6d5836, #3a2c18 70%); border:3px solid #d9b96a; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 0 0 3px rgba(60,40,10,.45), inset 0 0 12px rgba(0,0,0,.5); }
+  .hudRankLbl { font-size:9px; color:#fbbf24; font-weight:700; }
+  .hudRankNm { font-size:14px; font-weight:900; line-height:1.1; }
+  .hudRankPt { font-size:9.5px; color:#e8d5ae; }
+  .hudRight { flex:none; display:flex; flex-direction:column; gap:4px; }
+  .hudCur { background:rgba(0,0,0,.35); border:1px solid rgba(255,233,189,.3); border-radius:999px; padding:2.5px 9px; font-size:11px; text-align:right; white-space:nowrap; }
+  .banner { display:flex; align-items:center; gap:9px; background:#fffdf4; border:2px solid #e7cf9a; border-radius:14px; padding:7px 10px; margin-top:9px; box-shadow:0 3px 0 rgba(160,120,50,.3); }
+  .banner canvas { width:44px; height:44px; flex:none; }
+  .bannerTxt { flex:1; font-size:12px; line-height:1.55; color:#6d5836; }
+  .goBtn { flex:none; width:56px; height:56px; border-radius:50%; border:3px solid #fff; background:radial-gradient(circle at 50% 30%, #7dd3fc, #0284c7); color:#fff; font-weight:900; font-size:17px; font-style:italic; box-shadow:0 3px 8px rgba(2,132,199,.5); cursor:pointer; font-family:inherit; }
+  .hero { position:relative; margin-top:9px; border-radius:18px; overflow:hidden; background:linear-gradient(180deg,#aee3ff 0%,#d8f3ff 45%,#fdf3d0 78%,#e9d8a6 100%); border:2px solid #d9c08a; min-height:232px; display:flex; align-items:flex-end; justify-content:center; }
+  .hero::before { content:""; position:absolute; width:120px; height:120px; border-radius:50%; background:radial-gradient(circle,#fff8d6,rgba(255,248,214,0) 70%); left:-30px; top:-30px; }
+  .hero::after { content:""; position:absolute; left:0; right:0; bottom:0; height:52px; background:radial-gradient(ellipse at 50% 0%, #cbb27f, #b89a5e); opacity:.55; }
+  #homeChar { position:relative; z-index:2; padding-bottom:14px; }
+  #homeChar canvas { max-width:52vw; height:auto; }
+  .heroBtnsL { position:absolute; left:8px; bottom:56px; z-index:3; display:flex; flex-direction:column; gap:9px; }
+  .heroBtnsR { position:absolute; right:8px; top:10px; z-index:3; display:flex; flex-direction:column; gap:9px; }
+  .roundBtn { position:relative; width:52px; height:52px; border-radius:50%; border:2.5px solid #fff; background:rgba(255,253,244,.94); font-size:20px; box-shadow:0 3px 7px rgba(90,60,20,.35); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1; color:#6d5836; font-family:inherit; }
+  .roundBtn span { font-size:8px; font-weight:800; margin-top:2px; }
+  .bdg { position:absolute; top:-5px; right:-5px; width:19px; height:19px; border-radius:50%; background:#ef4444; color:#fff; font-size:12px; font-weight:900; font-style:normal; display:flex; align-items:center; justify-content:center; border:2px solid #fff; }
+  .namePlate { position:absolute; left:10px; bottom:10px; z-index:3; background:rgba(58,44,24,.87); color:#ffe9bd; border-radius:10px; padding:5px 11px; font-size:12.5px; line-height:1.45; }
+  .shortRow { display:flex; justify-content:space-around; margin-top:10px; background:rgba(255,253,244,.75); border:2px solid #e7cf9a; border-radius:999px; padding:7px 4px; }
+  .shortBtn { background:none; border:none; font-family:inherit; font-size:11px; font-weight:800; color:#6d5836; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .shortIc { font-size:23px; }
+  .homeBottom { display:flex; align-items:center; gap:9px; margin-top:11px; }
+  .homeAct { flex:1; position:relative; padding:13px 4px; font-size:13.5px; }
+  .homeAct .bdg { top:-7px; right:-4px; }
+  .questCircle { flex:none; width:104px; height:104px; border-radius:50%; border:4px solid #fff; background:radial-gradient(circle at 50% 28%, #67e8f9, #0891b2 75%); color:#fff; cursor:pointer; box-shadow:0 5px 14px rgba(8,145,178,.5); display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:inherit; }
+  .qcTtl { font-size:19px; font-weight:900; text-shadow:0 2px 0 rgba(0,60,80,.4); }
+  .qcSub { font-size:10px; font-weight:800; background:rgba(0,60,80,.35); border-radius:999px; padding:1px 8px; margin-top:3px; }
+  .note { font-size:12px; color:#a0865c; text-align:center; margin-top:8px; line-height:1.6; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo"><span class="logoBadge">🦴</span> カセキ遺伝子組み換えバトル <small>試作v16</small></div>
+    <button id="muteBtn" title="効果音オン/オフ">🔊</button>
+    <div class="stats" id="hdrStats"><span id="stRank">見習い</span><br>⚡<b id="stStamina">30</b> てもち<b id="stBox">0</b> ずかん<b id="stDex">0</b></div>
+  </header>
+  <main id="main">
+    <!-- ホーム（モンスト風） -->
+    <section class="view on" id="v-home">
+      <div class="hud">
+        <div class="hudLeft">
+          <div class="hudTitle">駆け出し研究員</div>
+          <div class="hudName">あっきー</div>
+          <div class="stamRow"><span class="stamLbl">⚡スタミナ</span><div class="stamBar"><div class="stamFill" id="hudStamFill"></div></div><span class="stamNum" id="hudStamNum"></span></div>
+        </div>
+        <div class="hudRank"><div class="hudRankLbl">ランク</div><div class="hudRankNm" id="hudRankNm">見習い</div><div class="hudRankPt" id="hudRankPt">0pt</div></div>
+        <div class="hudRight">
+          <div class="hudCur">🪨 岩 <b id="hudRocks">0</b></div>
+          <div class="hudCur">🎟 券 <b id="hudTickets">0</b></div>
+          <div class="hudCur">🦴 部位 <b id="hudParts">0</b></div>
+        </div>
+      </div>
+      <div class="banner">
+        <canvas id="bannerMascot" width="64" height="64"></canvas>
+        <div class="bannerTxt"><b>🎪 光る岩フェス開催中！</b><br>イベントクエストの報酬は、光る岩以上が確定だよ！</div>
+        <button class="goBtn" id="btnQuestEvent">GO!</button>
+      </div>
+      <div class="hero">
+        <div class="heroBtnsL">
+          <button class="roundBtn" id="btnStamRefill">⚡<span>回復</span></button>
+        </div>
+        <div id="homeChar"></div>
+        <div class="heroBtnsR">
+          <button class="roundBtn" id="btnNews">🔔<span>お知らせ</span></button>
+          <button class="roundBtn" id="btnGift">🎁<span>ギフト</span><i class="bdg" id="giftBdg">!</i></button>
+          <button class="roundBtn" id="btnRankInfo">🏅<span>ランク</span></button>
+        </div>
+        <div class="namePlate" id="homeCharName"></div>
+      </div>
+      <div class="shortRow">
+        <button class="shortBtn" id="btnHomeGacha"><span class="shortIc">🎰</span>ガチャ</button>
+        <button class="shortBtn" id="btnHomeRocks"><span class="shortIc">🪨</span>岩・部位</button>
+        <button class="shortBtn" id="btnHomeBreed"><span class="shortIc">🧬</span>組み換え</button>
+        <button class="shortBtn" id="btnHomeDex"><span class="shortIc">📖</span>ずかん</button>
+      </div>
+      <div class="homeBottom">
+        <button class="btn sub homeAct" id="btnMissions">📋 ミッション<i class="bdg" id="misBdg" style="display:none;">!</i></button>
+        <button class="questCircle" id="btnQuestGo"><span class="qcTtl">クエスト</span><span class="qcSub">バトルへ！</span></button>
+        <button class="btn teal homeAct" id="btnQuestEvent2">🎪 イベント</button>
+      </div>
+      <p class="note" style="text-align:center;">相棒は「てもち」の先頭の子。タップでてもちへ。</p>
+    </section>
+    <!-- 研究所 -->
+    <section class="view" id="v-lab">
+      <h2>🔬 カセキ研究所</h2>
+      <div class="mascotRow">
+        <canvas id="mascotCv2" width="64" height="64"></canvas>
+        <div class="bubble">ようこそ研究所へ！岩を手に入れて、骨を取り出して、復活させるのが仕事だよ。まずは岩ガチャから！</div>
+      </div>
+      <div class="card" style="display:block;">
+        <div class="nm">📊 研究員ステータス</div>
+        <div class="meta" id="homeStats"></div>
+      </div>
+      <button class="btn big" id="btnGacha" style="margin-top:12px;">🎰 岩ガチャを引く（試作：無料）</button>
+      <button class="btn teal big" id="btnEventRock" style="margin-top:8px;">🎪 イベントクエストはホームから</button>
+      <p class="note">岩は「岩・部位」タブにストックされるよ。レアな岩ほど中身もレア、でも岩は硬い！<br>岩を開けるにはスタミナ5を消費。時間で回復するよ。</p>
+    </section>
+    <!-- 岩・部位 -->
+    <section class="view" id="v-rock">
+      <h2>🪨 岩ストックと部位</h2>
+      <p class="desc">岩をタップで手動クリーニング、または自動クリーニング（3段階）で開けよう。部位が5つ揃った種は復活できる！</p>
+      <div class="list" id="rockList"></div>
+      <h2 style="margin-top:14px;">🦴 部位コレクション</h2>
+      <div id="partList"></div>
+    </section>
+        <!-- クリーニング -->
+    <section class="view" id="v-clean">
+      <h2>🖌️ 岩割りクリーニング</h2>
+      <p class="desc">制限時間なし。X線で形を覚え、道具5種を使い分けて骨を取り出そう。骨を叩くと評価ダウン！</p>
+      <div class="mascotRow">
+        <canvas id="mascotCv" width="64" height="64"></canvas>
+        <div class="bubble" id="mascotSay">まずはX線で形を覚えるのがコツ！</div>
+        <div class="progBox"><span id="progCvWrap"></span><div class="progBar"><div id="progFill"></div></div><div class="progPct" id="progPct">発掘率 0%</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <div style="font-weight:900;font-size:15px;white-space:nowrap;" id="cleanRockInfo">🪨 岩</div>
+        <div class="gauge" style="flex:1;margin:0;"><div id="timeGauge"></div></div>
+        <div style="font-weight:900;white-space:nowrap;">スコア <span id="cleanScore">0</span></div>
+      </div>
+      <div class="tools">
+        <button class="btn sub tool" id="ctXray">🩻 X線<small>残り <span id="xrayN">2</span> 回</small></button>
+        <button class="btn sub tool on" id="ctHammer">🔨 ハンマー<small>広く割る</small></button>
+        <button class="btn sub tool" id="ctDrillB">🌀 ドリル大<small>丸く深く削る</small></button>
+        <button class="btn sub tool" id="ctDrill">🌀 ドリル小<small>細かく削る</small></button>
+        <button class="btn sub tool" id="ctAir">💨 エア<small>粉を飛ばす</small></button>
+      </div>
+      <div id="cleanWrap"><canvas id="cleanCv" width="340" height="340"></canvas><div id="cursorRing"></div><div id="goodPop"></div></div>
+      <div class="gauge dmg"><div id="cleanDmgGauge"></div></div>
+      <p class="note" id="cleanInfo">化石ダメージ 0%</p>
+      <div class="cleanBtns">
+        <button class="btn teal big" id="btnFinish">✨ かんせい！</button>
+        <button class="btn sub big" id="btnCleanRetry">🔁 やりなおす</button>
+      </div>
+    </section>
+    <!-- てもち -->
+    <section class="view" id="v-box">
+      <h2>🎒 てもちの生物</h2>
+      <p class="desc">バトルには先頭の3体が自動で出るよ。タップで組み換えのベースに選べる。</p>
+      <div class="list" id="boxList"></div>
+    </section>
+    <!-- 遺伝子組み換え -->
+    <section class="view" id="v-breed">
+      <h2>🧬 遺伝子組み換え</h2>
+      <p class="desc">ベースにしたいリバモンを1体、遺伝子を渡すドナーを1体えらぶ。渡せるのは<b>部位1つ＋特技1つ</b>まで。<b>ドナーは消えてしまう</b>ので注意！見た目は変わらず、部位の特性（評価）と特技だけが変わるよ。</p>
+      <div class="list" id="breedList"></div>
+      <div id="breedLock"></div>
+      <button class="btn big" id="btnBreed" style="margin-top:12px;" disabled>🧬 組み換える（ベースとドナーをえらんでね）</button>
+    </section>
+    <!-- バトル -->
+    <section class="view" id="v-battle">
+      <h2>⚔️ バトル</h2>
+      <div id="battleArea">
+        <p class="desc">野生の生物チームと3対3のターン制バトル。「さくせん」で自動、「コマンド」で自分で指示できる。</p>
+        <button class="btn big" id="btnBattleStart">⚔️ バトル開始！</button>
+        <p class="note">勝つと経験値とランクポイントが手に入る。<br>てもちが0体だと戦えないよ。</p>
+      </div>
+    </section>
+    <!-- 図鑑 -->
+    <section class="view" id="v-dex">
+      <h2>📖 ずかん</h2>
+      <p class="desc">リバモン全100体の図鑑。復活させると記録されるよ。<span id="dexCount"></span></p>
+      <div class="dexgrid" id="dexGrid"></div>
+      <p class="note" id="dexEmpty" style="display:none;"></p>
+    </section>
+  </main>
+  <nav id="tabbar">
+    <button data-v="home" class="on"><span class="ic">🏠</span>ホーム</button>
+    <button data-v="lab"><span class="ic">🔬</span>研究所</button>
+    <button data-v="rock"><span class="ic">🪨</span>岩・部位</button>
+    <button data-v="box"><span class="ic">🎒</span>てもち</button>
+    <button data-v="breed"><span class="ic">🧬</span>組み換え</button>
+    <button data-v="battle"><span class="ic">⚔️</span>バトル</button>
+    <button data-v="dex"><span class="ic">📖</span>ずかん</button>
+  </nav>
+  <div id="modal"><div class="box" id="modalBox"></div></div>
+  <div id="fx"></div>
+</div>
+<script>
+"use strict";
+/* ============ データ定義 ============ */
+// 遺伝子スロット：body(体型) head(頭) horn(角) wing(翼) tail(尾) legs(脚) pattern(模様) hue(色相) size(大きさ)
+const PARTNAME = {
+  body:  ["まる", "なが", "たて", "がっちり"],
+  head:  ["まる頭", "しかく頭", "とんがり頭"],
+  horn:  ["なし", "1本角", "2本角", "王冠角"],
+  wing:  ["なし", "小さい翼", "大きな翼"],
+  tail:  ["なし", "長い尾", "くるりん尾"],
+  legs:  ["短い脚", "長い脚", "浮遊"],
+  pattern: ["無地", "しま模様", "水玉模様", "グラデ"],
+};
+const ELNAME = ["火", "水", "草", "光", "闇"];
+// 属性相性：攻撃側 -> {強い相手, 弱い相手}
+// 相性：火→草→水→火の三すくみ、光と闇は互いに弱点
+const ELCHART = { 0:{win:2, lose:1}, 1:{win:0, lose:2}, 2:{win:1, lose:0}, 3:{win:4, lose:4}, 4:{win:3, lose:3} };
+const SKILLS = [
+  { id:"bite",       nm:"かみつく",             pw:1.0,  el:-1, acc:100 },
+  { id:"tackle",     nm:"たいあたり",           pw:1.1,  el:-1, acc:95 },
+  { id:"scratch",    nm:"ひっかく",             pw:0.9,  el:-1, acc:100 },
+  { id:"rush",       nm:"とっしん",             pw:1.3,  el:-1, acc:85 },
+  { id:"crush",      nm:"かみくだく",           pw:1.25, el:-1, acc:90 },
+  { id:"rest",       nm:"きゅうけい",           pw:0,    el:-1, acc:100, heal:0.35, tgt:"self" },
+  { id:"spark",      nm:"ひばな",               pw:0.95, el:0, acc:100 },
+  { id:"flamebreath",nm:"かえんブレス",         pw:1.35, el:0, acc:95 },
+  { id:"sear",       nm:"しゃくねつ",           pw:1.2,  el:0, acc:90 },
+  { id:"magmata",    nm:"マグマタックル",       pw:1.5,  el:0, acc:85 },
+  { id:"erupt",      nm:"ふんかブレス",         pw:1.6,  el:0, acc:75 },
+  { id:"bubble",     nm:"あわバブル",           pw:0.9,  el:1, acc:100 },
+  { id:"watercannon",nm:"すいりゅうほう",       pw:1.35, el:1, acc:95 },
+  { id:"torrent",    nm:"げきりゅう",           pw:1.45, el:1, acc:90 },
+  { id:"bigwhirl",   nm:"おおうず",             pw:1.55, el:1, acc:80 },
+  { id:"waterheal",  nm:"みずのいやし",         pw:0,    el:1, acc:100, heal:0.30, tgt:"ally" },
+  { id:"vinebind",   nm:"つるしばり",           pw:1.1,  el:2, acc:100 },
+  { id:"leafblade",  nm:"リーフブレード",       pw:1.35, el:2, acc:95 },
+  { id:"petalfest",  nm:"はなまつり",           pw:1.5,  el:2, acc:85 },
+  { id:"rootdrain",  nm:"きゅうこんドレイン",   pw:1.1,  el:2, acc:95, drain:0.5 },
+  { id:"photosyn",   nm:"こうごうせい",         pw:0,    el:2, acc:100, heal:0.30, tgt:"self" },
+  { id:"lightshot",  nm:"ひかりのつぶて",       pw:0.95, el:3, acc:100 },
+  { id:"shineray",   nm:"シャインレイ",         pw:1.35, el:3, acc:95 },
+  { id:"flash",      nm:"めくらましフラッシュ", pw:1.15, el:3, acc:95 },
+  { id:"judgment",   nm:"ジャッジメントレイ",   pw:1.6,  el:3, acc:75 },
+  { id:"holyheal",   nm:"せいなるひかり",       pw:0,    el:3, acc:100, heal:0.35, tgt:"ally" },
+  { id:"shadownail", nm:"かげぬい",             pw:1.0,  el:4, acc:100 },
+  { id:"shadowclaw", nm:"シャドウクロー",       pw:1.35, el:4, acc:95 },
+  { id:"nightmare",  nm:"あくむバイト",         pw:1.3,  el:4, acc:90 },
+  { id:"darkbreath", nm:"あんこくブレス",       pw:1.5,  el:4, acc:85 },
+  { id:"lifedrain",  nm:"いのちドレイン",       pw:1.1,  el:4, acc:95, drain:0.5 },
+];
+const skillById = id => SKILLS.find(s => s.id === id);
+const RIBAMON = [[1,"ヒマル",0,2],[2,"ウキマル",1,2],[3,"モエマル",2,1],[4,"ヒカマル",3,5],[5,"ヤミマル",4,3],[6,"エンマル",0,2],[7,"ハサマル",1,2],[8,"シダマル",2,2],[9,"コウマル",3,1],[10,"ヨルマル",4,6],[11,"ヒヨン",0,2],[12,"クロシオ",1,4],[13,"クサビト",2,0],[14,"トウロウ",3,1],[15,"クラミ",4,3],[16,"タマビ",0,6],[17,"アマオト",1,1],[18,"コモレビ",2,4],[19,"ヒカヅル",3,5],[20,"コクヤ",4,4],[21,"ヒウチ",0,0],[22,"ウオビト",1,0],[23,"トゲビト",2,6],[24,"アケビト",3,0],[25,"クラビト",4,0],[26,"ヒノミ",0,1],[27,"フカミ",1,3],[28,"ハナバネ",2,5],[29,"ヒカケモ",3,2],[30,"ヤミケモ",4,2],[31,"フンカ",0,4],[32,"ミズツノ",1,6],[33,"モリレイ",2,3],[34,"ニジリュウ",3,4],[35,"ヨルバネ",4,5],[36,"ヒバネ",0,5],[37,"アメバネ",1,5],[38,"モリヌシ",2,7],[39,"ヒヌシ",3,7],[40,"ツキヌシ",4,7],[41,"カザンヌシ",0,7],[42,"ナミヌシ",1,7],[43,"ミチタネ",2,8],[44,"ホシユレ",3,3],[45,"ナゾカゲ",4,8],[46,"ヒノユレ",0,3],[47,"ナゾミズ",1,8],[48,"モリワニ",2,2],[49,"ナゾヒカリ",3,8],[50,"ヨルレイ",4,1],[51,"ナゾヒ",0,8],[52,"シオビト",1,0],[53,"ハナレイ",2,1],[54,"ギラミ",3,6],[55,"ヨルリュウ",4,4],[56,"スミレイ",0,1],[57,"アワレイ",1,1],[58,"ハタビト",2,0],[59,"アカリビト",3,0],[60,"ヨナカビト",4,0],[61,"ヒガラス",0,2],[62,"ミズドリ",1,2],[63,"モリキノ",2,2],[64,"ヒカウマ",3,2],[65,"ヨルズク",4,2],[66,"ヒオニ",0,6],[67,"ミズリュウ",1,4],[68,"クサリュウ",2,4],[69,"アケリュウ",3,4],[70,"ユメレイ",4,1],[71,"タキビト",0,0],[72,"ナギビト",1,0],[73,"モリユレ",2,3],[74,"アサレイ",3,1],[75,"ヒグレビト",4,0],[76,"マグリュウ",0,4],[77,"フカマ",1,6],[78,"イバマ",2,6],[79,"ヒカリテン",3,5],[80,"ヨルテン",4,5],[81,"ヒヘビ",0,2],[82,"ミズユレ",1,3],[83,"タネレイ",2,1],[84,"ヒカジカ",3,2],[85,"ヨルグモ",4,2],[86,"カジヌシ",0,7],[87,"アメヌシ",1,7],[88,"ダイチヌシ",2,7],[89,"ホシヌシ",3,7],[90,"ヨルヌシ",4,7],[91,"ヒガエル",0,2],[92,"ミズテン",1,5],[93,"ナゾハナ",2,8],[94,"ニジビト",3,0],[95,"カゲレイ",4,1],[96,"ゴウエンリュウ",0,4],[97,"シンエンマ",1,6],[98,"シンジュテン",2,5],[99,"テンコウシン",3,7],[100,"ゲンショウ",4,8]]; // [No, 名前, 属性, 種族]
+const DEXDESC = ["オレンジ色の丸い二足の小獣（約30cm）、頭に1本の「火種の角」、お腹に炎のコアが透けて見える丸い模様、耳が小さな炎の形。体の中に火種を持っていて、お腹がランタンみたいにほんのり光る。寝るときは火が小さくなってチロチロ揺れる。懐くとお腹をくっつけて温めてくれる。名前の由来：火（ヒ）＋丸","体が浮き輪みたいなドーナツ型（直径約40cm）、水色と白の縞模様、頭が輪の上にちょこんと乗り、頭頂に噴水口みたいな小さな突起。水面にプカプカ浮いて移動し、真ん中の穴から吸った水を頭の噴水口から噴き上げられる。陸では輪を転がして移動。のんびり屋で浮いたまま寝る。名前の由来：浮き輪（ウキ）＋丸","球根みたいな丸い体（約28cm）、黄緑色、頭に双葉の芽、腕は葉っぱ型、しっぽは根っこ状。日向ぼっこで光合成して元気になる。雨の日は頭の芽が大きく開く。寝るときは土に半分埋まって寝る。名前の由来：萌芽（モエ）＋丸","半透明の白い丸い体（約25cm）、体の中心に光のコア、頭の上に光の輪、背中に光の翼が2枚ある浮遊体。暗い場所ではランタン代わりの道案内役。自分が眩しすぎて寝つけないので、寝るときは大きな葉っぱを被って光を隠す。名前の由来：光（ヒカリ）＋丸","黒い影みたいな丸い体（約35cm）、コウモリ型の大きな翼耳、暗闇で目だけ黄色く光る。影から影へ音もなく移動できる。明るい場所が苦手で、昼間はヒカマルの影の中に隠れている（光と闇の相棒コンビ）。名前の由来：闇（ヤミ）＋丸","赤茶色の四足獣（約90cm）、首から背中にかけて炎のたてがみ、頭に後ろ向きの2本角、しっぽは炎が渦巻いている。走ると足元に火の粉が散る。プライドが高いけど、弱いリバモンを放っておけない兄貴分。名前の由来：炎（エン）＋丸","紺色の甲殻のカニ型（幅約70cm）、右腕だけ大きなハサミ、左は小さなハサミ、目が飛び出た眼柄、歩脚6本。口から泡を吹いて威嚇し、大きなハサミで岩も砕く。甲羅に小さいリバモンが乗って移動する「タクシー役」で、意外と面倒見がいい。名前の由来：ハサミ＋丸","深緑の四足の大型（約1.2m）、背中一面に苔とシダが生え、頭にシダの葉の冠、太い脚でのっそり歩く。背中の上で小さいリバモンたちが昼寝する「動く森」。雨が大好きで、雨の日は背中のシダがぐんぐん伸びる。名前の由来：シダ（羊歯）＋丸","体が水晶みたいな結晶質の四足（約80cm）、頭にプリズム状の角、背中に結晶の棘が並ぶ。太陽の光を体に集めて、角から虹色の光を放てる。曇りや雨の日は光が弱くて元気がない。名前の由来：光（コウ）＋丸","黒豹みたいな四足獣（約1m）、体の模様が紫にうっすら光る、しっぽの先が鎌状、大きな爪。完全な夜行性で昼間はずっと寝ている。足音がまったくしない忍び足の達人。月明かりの下では体の模様が強く光る。名前の由来：夜（ヨル）＋丸","黄〜オレンジの丸いひよこ型（約20cm）、頭のてっぺんに炎のとさか、小さな翼と鳥の足。感情で頭の炎が変化する（怒るとボッと大きく、嬉しいとゆらゆら）。飛べないけど一生懸命羽ばたくと少しだけ浮ける。名前の由来：ひよこの「ヒヨ」＋語尾「ン」","深い青の細長いドラゴン（全長約2.5m）、背中に波型のヒレ翼、頭に2本の角、あごにヒゲ状の感覚毛。海流に乗って長距離を移動する。普段は穏やかだけど、怒ると周りの水流ごと荒れる。名前の由来：黒潮（クロシオ）","人型（約1.3m）、緑がかった肌、頭に大きな花（季節で色が変わる）、腕から蔓が伸び、足裏は根っこ状。森の番人。口数は少ないけど植物の声が聞ける。歩いた跡に小さな花が咲く。名前の由来：草＋人","体が石灯籠みたいな形（約50cm）、頭の灯室がほんのり光る、短い手足でよちよち歩く。暗い森で道を照らす案内役。光に虫や小さいリバモンが集まってくるので、周りはいつも賑やか。名前の由来：灯籠（とうろう）","影のマントを羽織った浮遊体（約60cm）、顔は白い仮面みたいで表情が変わらない、体の下半分は煙状に揺れている。他人の影に潜んで移動できる。仮面の表情は一切変わらないのに、声のトーンで感情が全部バレる。名前の由来：暗み（くらみ＝暗さ）","炎の玉みたいな丸い体（約35cm）、小さな2本角、コウモリ翼、尻尾の先が炎の矢じり型。いたずら大好きな小悪魔。誰かを驚かせようとして、自分が一番驚くタイプ。名前の由来：玉＋火（火の玉）","体が水でできた人型に近い精霊（約70cm）、半透明の体、頭の上に小さな雨雲が浮かんでいて、いつもポツポツ雨が降っている。感情で雨量が変わる（嬉しいと小雨、悲しいと土砂降り）。周りの植物たちには大人気。名前の由来：雨音（あまおと）","緑のドラゴン（全長約1.8m）、背中に小さな木が生えていて葉の間から光が漏れる、角は枝、翼は大きな葉っぱ。背中の木陰で昼寝するのが大好き。歩くと周りに木漏れ日が揺れて、近くにいるだけで癒やされる。名前の由来：木漏れ日（こもれび）","白い鶴みたいな鳥型（翼幅約1.6m）、首元に光の輪、尾羽が光の帯みたいに流れる。空から光を運ぶ伝令役。飛んだ軌跡に光の粒が残って、夜は星の川みたいに見える。名前の由来：光＋鶴","黒いドラゴン（全長約3m）、紫にうっすら光る鱗の模様、大きなコウモリ型の翼、口から紫の炎。完全な夜行性。その紫の炎は物を燃やさず「影だけを燃やす」不思議な炎で、影が消えた相手はしばらく動けなくなる。名前の由来：黒夜（こくや）","人型（約1.1m）、赤茶色の肌、髪が炎みたいに逆立っている、手が大きくて器用、腰に道具袋。火の職人。手をパチンと鳴らして火花を散らし、火を起こせる。鍛冶が得意で、他のリバモンの道具作りも手伝う働き者。名前の由来：火打（ひうち＝火打石）","人型（約1.4m）、青い鱗の肌、手足に水かき、背中にヒレ、頭の横にエラ。川と海を行き来する漁師タイプ。水の流れを読むのが得意で、溺れたリバモンを助けるライフセーバー役でもある。名前の由来：魚＋人","人型に近い悪魔（約90cm）、全身に茨の蔓が巻きつき、頭に真っ赤なバラの花、小さな角と棘だらけの翼。見た目は怖いけど花が大好き。自分の棘で守った花畑を、内緒で大事に育てている。名前の由来：棘＋人","人型（約1.5m）、金色の髪、背中に光のマントみたいな翼膜、胸に朝日のコア。夜明けとともに現れる旅人タイプ。朝の光を集めて持っていて、暗闇で困っているリバモンを助けて回っている。名前の由来：明け（夜明け）＋人","人型（約1.6m）、黒いフード状の外皮、顔は目だけが光る、体は影を編んだみたいな質感。影の案内人。影と影をつなぐ近道を知っていて、迷子のリバモンを送り届ける。口数は少ないけど頼りになる。名前の由来：暗（くら）＋人","ろうそくの炎みたいな小さな精霊（約25cm）、体の中心に炎のコア、頭の炎がゆらゆら揺れる浮遊体。暗い洞窟の案内役。炎の色で気持ちが全部分かる（元気なときはオレンジ、眠いときは青く小さくなる）。名前の由来：火の実","半透明の深海魚みたいなゴースト（約80cm）、頭に提灯みたいな光る突起、暗い青の体がゆらゆら揺れる。深海の暗闇に住む。提灯の光で、迷ったリバモンを浅瀬まで導いてくれる。地上の明るさは苦手。名前の由来：深み（ふかみ）","小さな天使（約40cm）、翼が花びらでできている、頭に花の輪、体は若草色。花の香りを運ぶ役。飛ぶたびに花びらが舞って、通った後の枯れた花畑が少しずつ元気になっていく。名前の由来：花＋羽","光る毛並みの四足獣（約70cm）、白金の毛並み、背中の毛が光の粒を放つ、大きな耳。夜の森の案内役。体がほんのり光るので群れの先頭を歩く。実は怖がりで、驚くとパッと強く光って目くらましして逃げる。名前の由来：光＋ケモノ","影みたいな四足獣（約70cm）、真っ黒な毛並み、目だけ金色に光る、足音がまったくしない。ヒカケモの相棒で、正反対に大胆な性格。暗闇では一番頼りになるけど、明るい場所では影に隠れて出てこない。名前の由来：闇＋ケモノ","赤いドラゴン（全長約2.2m）、背中に火山みたいな隆起、鼻からいつも少し煙が出ている。火山の近くに住む。普段は温厚だけど、くしゃみをすると火花が飛んで周りが大騒ぎ。背中の隆起から湯気が出ているときは機嫌がいい証拠。名前の由来：噴火","海の小悪魔（約60cm）、水色の体、小さな悪魔の角、ヒレ状のコウモリ翼、しっぽの先が三叉の槍みたいな形。いたずら好きで、泳いでいるリバモンの足をくすぐって驚かせる。でも溺れかけている子を見ると、誰よりも先に助けに行く。名前の由来：水＋角","苔むしたゴースト（約50cm）、半透明の緑の体、頭にキノコの傘、体のあちこちから小さな芽が生えている。森の古い木に宿っている。迷ったリバモンの前にふわっと現れて、出口まで案内すると消える。名前の由来：森＋霊","白いドラゴン（全長約2m）、鱗が光の角度で虹色に変わる、半透明の翼も虹色に輝く。雨上がりにだけ姿を見せる。飛んだ軌跡に小さな虹が残るので、見つけた人は幸運だと言われている。名前の由来：虹＋竜","黒い翼の天使（約1.2m）、片翼にだけ白い羽が混じっている、頭の輪は欠けた黒い輪。元は光の天使だったが、夜の世界に憧れて降りてきた。今は夜に迷ったリバモンを星明かりで導く役。名前の由来：夜＋羽","炎の翼を持つ天使（約90cm）、翼が炎でできている、頭の輪も炎の輪。寒い夜に空から火の粉をまいて、凍えているリバモンたちを温める。でも近づきすぎると周りが焦げてしまうので、距離感に悩んでいる。名前の由来：火＋羽","雨の天使（約80cm）、翼が水の膜でできている、頭の輪は水滴の輪。雨の日にだけ現れて、乾いた土地に翼から優しい雨を降らせる。晴れの日は雲の中で寝ている。名前の由来：雨＋羽","巨大な大樹の神（約5m）、体が大木そのもの、腕は枝、頭に大きな枝角と葉の冠、体に苔と花が咲いている。古代の支配者級。森全体を見守っていて、めったに動かない。モリヌシが動くときは、森の運命が変わるときだと言われている。名前の由来：森の主","太陽の神（約3m）、金の体、背中に太陽の輪、頭に炎の冠。古代の支配者級。朝になると空に昇って世界に光を届ける。曇りの日は機嫌が悪く、なかなか昇ってこないので、地上のリバモンたちが心配する。名前の由来：日の主","月の神（約3m）、銀の体、背中に三日月の輪、頭に月の冠。古代の支配者級。夜になると静かに現れて、眠るリバモンたちを見守る。満月の夜は少しだけ嬉しそうで、光が強くなる。名前の由来：月の主","火山の神（約4m）、黒い岩の体にマグマの亀裂が光る、頭に噴火口みたいな冠。古代の支配者級。火山の奥で眠っていて、目覚めると噴火が起きると言われている。その寝息が火山の湯気になっている。名前の由来：火山の主","海の神（約4m）、青い巨体、背中に波の輪、頭に珊瑚の冠、体に泡と貝の模様。古代の支配者級。海の底で潮の流れを司っている。怒ると大波が起きると言われているけど、実は静かな海が一番好き。名前の由来：波の主","分類不能の植物体（約45cm）、体の形が日によって少しずつ変わる、頭の花はずっと蕾のままで、咲いたところを誰も見たことがない。「原初の岩」に残る遺伝情報と似ていると言われる存在。モグ博士でも分類できず、図鑑では「調査中」扱い。名前の由来：未知＋種","星のゴースト（約55cm）、半透明の体に星屑が瞬いている、頭に小さな星の飾り、下半分は尾みたいに揺れる浮遊体。流れ星が落ちた場所に現れる。願いごとを集めていると言われていて、本当に叶える力があるのかは誰も知らない。名前の由来：星＋幽霊（ゆうれい）","分類不能の影の存在（約70cm）、輪郭が常にぼやけていて、写真に撮っても写らない。他のリバモンの影に紛れて移動する。ミチタネと同じく「原初の岩」の遺伝情報に近いとされる。目撃証言は多いのに、記録が一切残らない。名前の由来：謎＋影","炎のゴースト（約50cm）、青白い炎の体、顔だけがぼんやり浮かんでいる、下半分は炎の尾の浮遊体。古い遺跡や洞窟に棲みついている。近づくと昔の出来事の幻を見せることがある。怖がらせるつもりはなくて、ただ誰かに見ていてほしいだけ。名前の由来：火＋幽霊（ゆうれい）","分類不能の水の存在（大きさ不定）、水たまりからふっと現れる、体の中に小さな魚影みたいなものが見える。触ろうとすると水に戻ってしまうので標本が取れない。ミチタネ・ナゾカゲと並ぶ「原初の岩」系の謎の存在。名前の由来：謎＋水","苔むしたワニ型（全長約1.5m）、背中に苔と小さな花、大きな顎。沼地でのんびり暮らす。見た目は怖いけど動くのが面倒で基本的に何もしない。水面に浮かんで日向ぼっこしている姿は丸太にしか見えない。口を開けると小鳥が歯磨きに来る。名前の由来：森＋ワニ","分類不能の光の存在（約40cm）、光の粒が集まった人影みたいな形をしている。近づくとふっと消える。暗い場所にだけ現れる「原初の岩」系の謎の存在。ミチタネ・ナゾカゲ・ナゾミズと並ぶ4体目。光っているのに影がない。名前の由来：謎＋光","夜の精霊（約65cm）、濃紺の半透明の体に小さな星みたいな点が瞬いている、大きな耳の浮遊体。眠れないリバモンのところに現れて、子守唄みたいな音で眠らせてくれる。朝になると消える。名前の由来：夜＋霊","分類不能の炎の存在（約35cm）、燃えているのに熱くない不思議な炎の体。触っても火傷しない。「原初の岩」系の謎の存在5体目。「冷たい炎」と呼ばれ、研究所でも再現できない。寒い場所でだけ姿を現す。名前の由来：謎＋火","人型（約1.3m）、浅い青の肌、髪が海藻みたいに揺れる、首に貝殻の飾り。潮の満ち引きを読む漁の名人。素潜りが得意で、潜っている間は息をとても長く止められる。その代わり陸では少し動きが鈍い。名前の由来：潮＋人","花の精霊（約30cm）、体が花びらでできている、頭に大きな一輪の花が咲いている。通った場所に花の香りの軌跡が残る。季節ごとに頭の花の種類が変わるので、研究者たちはハナレイで季節を知る。名前の由来：花＋霊","光の小悪魔（約55cm）、金色の体、小さな悪魔の角と翼、体がギラギラ光を反射する。眩しさで目くらましするいたずらが得意。自分が一番目立つ場所が大好きで、鏡の前でポーズを決めていることが多い。名前の由来：ギラギラ＋悪魔の「ミ」","小さな黒いドラゴン（全長約90cm）、紫にうっすら光る鱗の模様、まだ小さい翼と角。コクヤに憧れている子ドラゴン。大きく息を吸うと紫の火花が少しだけ出る。夜更かしが大好きで、昼間はずっと眠そうにしている。名前の由来：夜＋竜","炭の精霊（約30cm）、黒い炭の体に赤い熾火（おきび）の模様が脈打つ、頭に小さな炎。焚き火の後に残った炭に宿る精霊。ゆっくり長く燃え続けるタイプで、そばにいると長く温かい。急に水をかけられると驚いて煙を出す。名前の由来：炭＋霊","泡の精霊（約25cm）、泡でできた丸い体、頭の泡がパチンと弾けてはまた膨らむ。川や滝の泡に宿る精霊。はしゃぐと周りに泡が増えていく。長くは生きられず、弾けて消えてはまた生まれる、儚い存在。名前の由来：泡＋霊","人型（約1.2m）、麦わら色の髪、背中に大きな葉の傘、腕に実の模様。畑仕事の名人。ハタビトが歩いた跡は作物がよく育つと言われている。収穫の時期は大忙しで、終わると冬眠みたいに長く寝る。名前の由来：畑＋人","人型（約1.4m）、白い髪、手のひらにランタンみたいな光の玉が浮かぶ、背中に小さな光の輪。灯台守みたいな案内人。夜の道で迷ったリバモンを光で導く。声が穏やかで、聞いていると安心する。名前の由来：灯り＋人","人型（約1.5m）、黒い髪、目の周りに星の模様、夜警みたいな静かな佇まい。夜中の見回り役。眠っているリバモンたちの夢を守っていると言われている。昼間はどこにいるのか誰も知らない。名前の由来：夜中＋人","炎のカラス（全長約70cm）、黒い羽の先端が赤く燃えている、賢そうな目。山火事の跡に現れて、灰の中から何か探している。言葉を少しだけ真似できる賢さがある。燃え残りの枝を集めて巣を作る。名前の由来：火＋カラス","水鳥型（全長約80cm）、青い羽、水かきのある大きな足、平たい嘴。水面を走って離陸する。泳ぎは得意だけど飛ぶのは少し苦手で、着水はいつも派手に水しぶきが上がる。名前の由来：水＋鳥","キノコ型（約60cm）、大きな傘に苔と小さな花がついている、短い手足。雨の日にだけ元気になる。傘の下は小さな虫たちの雨宿り場所になっている。胞子を飛ばすと、周りに小さなキノコが一斉に生える。名前の由来：森＋キノコ","光の馬型（体高約1.6m）、白い体に金のたてがみ、額に短い光の角。駆けるたびに光の蹄跡（ひづめあと）が残る。朝日と一緒に現れることが多く、ヒカウマを見た人は一日元気でいられると言われている。名前の由来：光＋馬","夜のフクロウ型（体高約50cm）、濃紺の羽、大きな金色の目、首がぐるりと回る。夜の森の見張り役。音もなく飛んで、異変があると「ホー」と一声鳴いて知らせる。昼間は木の洞（うろ）で丸くなって寝ている。名前の由来：夜＋ミミズク","炎の小鬼（約80cm）、赤い肌、一本角、腰に虎柄っぽい模様、手に小さな金棒みたいな岩の棒。鍛冶場の近くに住みつく。鉄を打つ音が好きで、真似して岩をカンカン叩いている。怒ると頭の角から火花が散る。名前の由来：火＋鬼","川のドラゴン（全長約2.5m）、青緑の鱗、背中に水草みたいなヒレ、長い髭。大きな川の主で、雨を呼ぶと言われている。普段は淵の底で眠っていて、川が荒れると現れて流れを鎮める。名前の由来：水＋竜","森のドラゴン（全長約2m）、緑の鱗に苔と葉が混じっている、角が木の枝みたいに伸びる。森の奥で静かに暮らす。体に鳥が巣を作ることがあるくらい穏やか。怒ったところを見た者はいない。名前の由来：草＋竜","夜明けのドラゴン（全長約2.2m）、白と金の鱗、翼の膜が朝焼け色に透ける。夜明けとともに山の頂上に現れて朝日を浴びる。アケリュウが鳴くと、夜のリバモンたちは寝床に帰っていく。名前の由来：明け＋竜","夢の精霊（約45cm）、紫の半透明の体、頭に三日月みたいな飾り、いつも眠そうな目。悪夢を食べてくれる精霊。食べた悪夢は朝露みたいに消えていく。自分はいつも眠くて、話しながら寝てしまうことがある。名前の由来：夢＋霊","人型（約1.3m）、赤茶色の髪、手に火の粉みたいな模様。焚き火の番人。旅のリバモンたちのために火を守り続ける。火加減の名人で、どんな湿った薪でも火をつけられる。火が消えるのを見ると少し悲しくなる。名前の由来：焚き火＋人","人型（約1.35m）、穏やかな青緑の髪、首に波紋みたいな模様。凪（なぎ）の番人。荒れた海を静める力があると言われている。声も動きもゆっくりで、そばにいると波の音まで穏やかに聞こえる。名前の由来：凪＋人","森のゴースト（約55cm）、半透明の緑の体、頭に葉と小さな花、下半分は葉の尾みたいに揺れる浮遊体。倒れた大樹に宿るゴースト。森で迷った者を、木の実が落ちる音で出口まで誘導してくれる。声は風の音に似ている。名前の由来：森＋幽霊","朝の精霊（約35cm）、金色の半透明の体、頭に朝日の輪みたいな飾り。朝日と一緒に現れる精霊。アサレイが通ると夜露がキラキラ光る。夕方になると光が弱くなって、そのまま眠くなる。名前の由来：朝＋霊","人型（約1.45m）、夕焼け色から紺色へグラデーションした髪。夕方にだけ姿を現す。昼のリバモンと夜のリバモンの橋渡し役で、夕焼けが終わると消えてしまう。会える時間が短いので、話すのがとても速い。名前の由来：日暮れ＋人","溶岩のドラゴン（全長約3.5m）、黒い岩みたいな鱗の隙間からマグマが光る、背びれは溶岩の流れみたいな形。火山の地下深くに棲む。溶岩の川を泳いで移動する。地上に姿を現すのは噴火の前兆と言われている。名前の由来：マグマ＋竜","深海の小悪魔（約60cm）、濃い青の体、小さな角とコウモリみたいなヒレ翼、提灯みたいに光る触角。深海に棲む。光る触角で獲物をおびき寄せるけど、本人は寂しがり屋で話し相手がほしいだけ。誰か来ると嬉しくて光が強くなる。名前の由来：深＋魔","茨の小悪魔（約70cm）、濃い緑の体、茨の角と蔓の翼、頭にバラみたいな花が1つ咲いている。茨の茂みに棲む。縄張りに入ると蔓で絡めて動けなくするけど、花を褒めると照れてほどいてくれる。名前の由来：茨＋魔","光の天使（約90cm）、白と金の羽、頭に光の輪、穏やかな表情。迷子のリバモンを守る守護天使役。翼で包むと安心して眠れる。戦うことより守ることが得意。名前の由来：光＋天（天使）","夜の天使（約85cm）、濃紺の羽、頭の輪は欠けた三日月みたいな形。夜のリバモンたちを見守る天使。昼の光が苦手で夜にだけ活動する。ヨルバネとは夜の見守りコンビ。名前の由来：夜＋天（天使）","炎のヘビ（全長約1.2m）、赤い鱗、背中に炎の鬣（たてがみ）みたいなヒレ。乾燥した岩場に棲む。体が熱いので、冬は他のリバモンが温まりに集まってくる。脱皮した皮は熱で燃え尽きて残らない。名前の由来：火＋蛇","水のゴースト（約50cm）、半透明の青い体、頭に水滴の飾り、下半分は水の尾みたいに揺れる浮遊体。雨の日にだけ現れる。湖のほとりで昔の出来事の幻を見せることがある。晴れた日は水底で眠っている。名前の由来：水＋幽霊","種の精霊（約20cm）、小さな丸い体、頭に双葉、背中に種の袋みたいな膨らみ。種を運ぶ精霊。タネレイが歩いた場所には、次の春に芽が出る。冬は土の中で眠って過ごす。名前の由来：種＋霊","光の鹿型（体高約1.4m）、白い体、角が枝みたいに広がって先端が光る。森の開けた場所に現れる。ヒカジカの角の光を目印に、夜の森で迷った者が帰り道を見つけると言われる。とても警戒心が強く、近づくと光を消して逃げてしまう。名前の由来：光＋鹿","夜のクモ型（体長約60cm）、黒い体に紫の模様、8本脚、背中に星みたいな点。洞窟の入り口に巣を張る。巣にかかった虫を食べるけど、リバモンは巣の横を通してくれる。巣の糸は朝露を受けてキラキラ光る。名前の由来：夜＋蜘蛛","鍛冶の神（約3.5m）、赤銅色の巨体、金槌みたいに太い腕、頭に炎の冠。古代の支配者級。山の鍛冶場で眠り、目覚めると地鳴りがする。リバモンたちが使う道具の原型は、カジヌシが打ったものと言われている。名前の由来：鍛冶の主","雨の神（約3.8m）、深い青の巨体、背中に雨雲の輪、頭に滝みたいな冠、体の周りに常に細い雨が降っている。古代の支配者級。空の上で雨を司る。アメヌシの周りだけは、晴れていても雨が降る。干ばつの年は、皆がアメヌシの眠る岩を探すと言われる。名前の由来：雨の主","大地の神（約4.2m）、土と岩の巨体、背中に大樹が生えている、頭に実の冠。古代の支配者級。大地そのものみたいな存在で、歩くたびに足跡から草花が芽吹く。普段は山の姿で眠っているので、誰も気づかない。名前の由来：大地の主","星の神（約3.2m）、白金の体に星屑の模様、背中に星座の輪、頭に星の冠。古代の支配者級。星の運行を司る。流れ星はホシヌシが星を並べ替えた跡だと言われている。ツキヌシとは古い知り合い。名前の由来：星の主","夜の神（約3.6m）、黒い巨体に星屑の点、背中に闇の輪、頭に欠けた月の冠。古代の支配者級。夜そのものを司る。ヨルヌシが目を閉じると夜が明けないと言われている。ツキヌシ・ホシヌシとは古い知り合い。名前の由来：夜の主","炎のカエル型（約40cm）、赤い体、背中に炎の模様、喉袋が提灯みたいに光る。温泉の近くに棲む。鳴くと喉袋が光るので、夜の温泉場の明かり代わりになっている。熱いお湯が大好き。名前の由来：火＋蛙","水の天使（約80cm）、水色の羽、頭の輪は水滴の形、翼を広げると小さな虹がかかることがある。雨上がりに現れる。水たまりの上で遊ぶのが大好き。アメバネとは雨の日の友達。名前の由来：水＋天（天使）","分類不能の花の存在（約30cm）、花びらの色が見る人によって違って見える。「原初の岩」系6体目。香りを記録しようとすると機械が故障する。咲くのは数十年に一度と言われ、咲いた花を見た者の記録は食い違ってばかり。名前の由来：謎＋花","人型（約1.35m）、髪が虹色のグラデーション、歩くと足元に小さな虹がかかる。雨上がりにだけ姿を現す案内人。ニジビトについていくと宝のある場所に着くという言い伝えがあるけど、途中で見失う者がほとんど。名前の由来：虹＋人","影の精霊（約40cm）、黒い半透明の体、昼間は誰かの影の中に隠れている。影に宿る精霊。宿主の影の中で居眠りするのが好き。夕方になると影が伸びて元気になる。自分には影がないのが密かな悩み。名前の由来：影＋霊","轟炎の竜（全長約6m）、黒と深紅の鱗、翼膜は溶岩、角は炎の冠状。火山帯の頂点に君臨する最強格の竜。咆哮に合わせて火山が噴火すると言われる。名前の由来：轟炎龍","深淵の悪魔（約2.8m）、漆黒の青い体、巨大な角とヒレ翼、大きく光る触角。深海の底の宮殿に住む悪魔の王。フカマはその配下と言われる。名前の由来：深淵の魔","神樹の天使（約2.5m）、白緑の羽が何枚も重なる、頭の輪は葉と実。世界樹のような大樹に宿る天使。羽が落ちた場所には聖なる森が生まれる。名前の由来：神樹の天（天使）","天光の神（約4.5m）、金白の巨体、背中に太陽の輪。古代の支配者の中でも最上位の神。姿を見た者は、まぶしさで目を開けていられない。名前の由来：天光の神","原初の存在（大きさ不定）、黒い岩と闇が混ざった姿、目だけが光る。「原初の岩」そのものから生まれた、最初で最後のリバモン。全てのリバモンの遺伝情報の源と言われる。図鑑の最後のページはゲンショウのために空けてある。名前の由来：原初"]; // 図鑑詳細（特徴）
+const TRIBES = ["人", "精霊", "モンスター", "ゴースト", "ドラゴン", "天使", "悪魔", "神", "未知"];
+const ELPOOL = [
+  ["spark", "flamebreath", "sear", "magmata", "erupt"],
+  ["bubble", "watercannon", "torrent", "bigwhirl", "waterheal"],
+  ["vinebind", "leafblade", "petalfest", "rootdrain", "photosyn"],
+  ["lightshot", "shineray", "flash", "judgment", "holyheal"],
+  ["shadownail", "shadowclaw", "nightmare", "darkbreath", "lifedrain"],
+];
+const BIGPOOL = [["magmata", "erupt"], ["torrent", "bigwhirl"], ["petalfest"], ["judgment"], ["darkbreath"]];
+const HEALPOOL = ["rest", "waterheal", "photosyn", "holyheal"];
+const BASICPOOL = ["bite", "tackle", "scratch"];
+const TRIBEPOOL = [
+  ["rush", "crush"],      // 人
+  [],                     // 精霊（属性プールから追加で引く）
+  ["crush", "rush"],      // モンスター
+  ["shadownail", "nightmare"], // ゴースト
+  [],                     // ドラゴン（大技プール）
+  ["holyheal", "rest"],   // 天使
+  ["rootdrain", "lifedrain"], // 悪魔
+  [],                     // 神（大技＋回復）
+  [],                     // 未知（全特技から）
+];
+const TRIBE_BIAS = [
+  { hp:1.00, atk:1.00, def:1.00, spd:1.00 }, // 人
+  { hp:0.90, atk:1.10, def:0.90, spd:1.15 }, // 精霊
+  { hp:1.10, atk:1.10, def:1.00, spd:0.95 }, // モンスター
+  { hp:0.85, atk:1.05, def:1.10, spd:1.20 }, // ゴースト
+  { hp:1.15, atk:1.30, def:1.00, spd:1.00 }, // ドラゴン
+  { hp:1.05, atk:1.00, def:1.15, spd:1.05 }, // 天使
+  { hp:1.00, atk:1.20, def:0.90, spd:1.15 }, // 悪魔
+  { hp:1.25, atk:1.25, def:1.20, spd:1.10 }, // 神
+  { hp:1.10, atk:1.10, def:1.10, spd:1.10 }, // 未知
+];
+const ELHUE = [[5, 45], [195, 240], [85, 150], [42, 58], [255, 300]];
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+// 種（リバモン100体）。genesは図鑑No.から決定的に生成（試作用の仮ビジュアル。本番はユーザーのデザイン画に差し替え）
+const SPECIES = RIBAMON.map(r => {
+  const no = r[0], nm = r[1], el = r[2], tr = r[3];
+  const R = mulberry32(no * 7919 + 13);
+  const ri2 = n => Math.floor(R() * n);
+  const genes = { body: ri2(4), head: ri2(3), horn: ri2(4), wing: ri2(3), tail: ri2(3), legs: ri2(3), pattern: ri2(4), hue: 0, size: 1 };
+  if (tr === 4 || tr === 5 || tr === 6) genes.wing = 1 + ri2(2); // ドラゴン・天使・悪魔は翼
+  if (tr === 4 || tr === 7) genes.horn = 1 + ri2(3); // ドラゴン・神は角
+  if (tr === 3) genes.legs = 2; // ゴーストは浮遊
+  const hr = ELHUE[el];
+  genes.hue = Math.round(hr[0] + R() * (hr[1] - hr[0]));
+  genes.size = Math.round((0.75 + R() * 0.5 + (tr === 4 || tr === 7 ? 0.15 : 0)) * 100) / 100;
+  const pk = arr => arr[Math.floor(R() * arr.length)];
+  const skSet = [];
+  const addSk = id => { if (id && !skSet.includes(id)) skSet.push(id); };
+  addSk(pk(ELPOOL[el])); addSk(pk(ELPOOL[el]));
+  if (tr === 1) addSk(pk(ELPOOL[el]));
+  else if (tr === 4) addSk(pk(BIGPOOL[el]));
+  else if (tr === 7) { addSk(pk(BIGPOOL[el])); addSk(pk(HEALPOOL)); }
+  else if (tr === 8) addSk(pk(SKILLS).id);
+  else addSk(pk(TRIBEPOOL[tr]));
+  addSk(pk(BASICPOOL));
+  const skills = skSet.slice(0, 4);
+  return { nm, el, tribe: tr, no, genes, bias: TRIBE_BIAS[tr], skills };
+});
+const PARTS = ["あたま", "どうたい", "うで", "あし", "しっぽ"];
+const GRADE_MULT = { S:1.30, A:1.15, B:1.05, C:1.00 };
+const GRADE_JP = { S:"完璧", A:"きれい", B:"ふつう", C:"キズあり" };
+
+/* ============ 状態 ============ */
+let S = { box: [], dex: {}, sel: [], uid: 1, mute: false, rocks: [], parts: {}, stamina: { cur: 30, last: Date.now() }, rankPt: 0, tickets: 3, missionsClaimed: {}, giftTaken: false };
+try {
+  const raw = localStorage.getItem("kaseki-proto-v16");
+  if (raw) S = Object.assign(S, JSON.parse(raw));
+} catch (e) {}
+if (!Array.isArray(S.rocks)) S.rocks = [];
+if (!S.parts || typeof S.parts !== "object") S.parts = {};
+if (!S.stamina) S.stamina = { cur: 30, last: Date.now() };
+if (typeof S.rankPt !== "number") S.rankPt = 0;
+if (typeof S.tickets !== "number") S.tickets = 3;
+if (!S.missionsClaimed || typeof S.missionsClaimed !== "object") S.missionsClaimed = {};
+if (typeof S.giftTaken !== "boolean") S.giftTaken = false;
+function save() {
+  try { localStorage.setItem("kaseki-proto-v16", JSON.stringify(S)); } catch (e) {}
+  document.getElementById("stBox").textContent = S.box.length;
+  document.getElementById("stDex").textContent = Object.keys(S.dex).length;
+  if (typeof renderHeader === "function") renderHeader();
+}
+const rnd = (a, b) => a + Math.random() * (b - a);
+const ri = n => Math.floor(Math.random() * n);
+const pick = arr => arr[ri(arr.length)];
+
+/* ============ 効果音（WebAudio合成） ============ */
+let AC = null;
+function se(kind) {
+  if (S.mute) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === "suspended") AC.resume();
+    const t = AC.currentTime;
+    const tone = (f0, f1, dur, type, vol, delay) => {
+      const o = AC.createOscillator(), g = AC.createGain();
+      o.type = type || "sine";
+      o.frequency.setValueAtTime(f0, t + (delay || 0));
+      o.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t + (delay || 0) + dur);
+      g.gain.setValueAtTime(vol || 0.12, t + (delay || 0));
+      g.gain.exponentialRampToValueAtTime(0.001, t + (delay || 0) + dur);
+      o.connect(g).connect(AC.destination);
+      o.start(t + (delay || 0)); o.stop(t + (delay || 0) + dur + 0.02);
+    };
+    const noise = (dur, vol, delay, freq) => {
+      const len = Math.floor(AC.sampleRate * dur);
+      const buf = AC.createBuffer(1, len, AC.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      const src = AC.createBufferSource(); src.buffer = buf;
+      const f = AC.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = freq || 900;
+      const g = AC.createGain(); g.gain.value = vol || 0.15;
+      src.connect(f).connect(g).connect(AC.destination);
+      src.start(t + (delay || 0));
+    };
+    switch (kind) {
+      case "tap": tone(170, 90, 0.07, "square", 0.06); break;
+      case "break": noise(0.16, 0.2, 0, 700); tone(120, 50, 0.14, "triangle", 0.14); break;
+      case "fossil": tone(880, 880, 0.09, "sine", 0.1); tone(1318, 1318, 0.14, "sine", 0.1, 0.08); break;
+      case "hammer": noise(0.1, 0.22, 0, 500); tone(90, 45, 0.1, "sine", 0.18); break;
+      case "hit": tone(200, 60, 0.13, "sawtooth", 0.1); noise(0.08, 0.1, 0, 1200); break;
+      case "sparkle": [660, 880, 1108].forEach((f, i) => tone(f, f, 0.12, "sine", 0.09, i * 0.07)); break;
+      case "win": [523, 659, 784, 1046].forEach((f, i) => tone(f, f, 0.16, "triangle", 0.11, i * 0.09)); break;
+    }
+  } catch (e) {}
+}
+
+/* ============ 生物生成 ============ */
+function statsFromGenes(g, bias, mult) {
+  const partBonus = {
+    hp:  (g.body === 3 ? 14 : g.body === 0 ? 8 : 4) + g.size * 8,
+    atk: (g.horn >= 2 ? 9 : g.horn === 1 ? 5 : 0) + (g.body === 2 ? 4 : 0),
+    def: (g.body === 3 ? 9 : 0) + (g.pattern === 1 ? 3 : 0),
+    spd: (g.wing === 2 ? 10 : g.wing === 1 ? 5 : 0) + (g.legs === 1 ? 4 : 0) - (g.size - 1) * 8,
+  };
+  const base = { hp: 46, atk: 15, def: 13, spd: 12 };
+  const st = {};
+  for (const k of ["hp", "atk", "def", "spd"]) {
+    st[k] = Math.max(3, Math.round((base[k] + partBonus[k]) * (bias ? bias[k] : 1) * mult * rnd(0.92, 1.08)));
+  }
+  return st;
+}
+function nameFromGenes(g) {
+  const pre = g.horn === 3 ? "キング" : g.horn >= 1 ? "ツノ" : g.wing >= 1 ? "ハネ" : g.tail === 2 ? "クル" : g.pattern === 2 ? "プニ" : g.body === 1 ? "ナガ" : "マル";
+  const suf = g.body === 3 ? "ゴン" : g.body === 1 ? "リュー" : g.body === 2 ? "ドン" : "マル";
+  const col = g.hue < 25 || g.hue >= 340 ? "アカ" : g.hue < 70 ? "キイ" : g.hue < 160 ? "ミド" : g.hue < 250 ? "アオ" : "ムラ";
+  return pre + col + suf;
+}
+function makeCreature(genes, el, skills, origin) {
+  const st = statsFromGenes(genes, null, origin.mult || 1);
+  const c = {
+    id: S.uid++, genes: Object.assign({}, genes), el,
+    skills: skills.slice(0, 4), stats: st, maxhp: st.hp,
+    name: origin.name || nameFromGenes(genes),
+    grade: origin.grade || null, origin: origin.kind,
+    lv: 1, exp: 0, parts: origin.parts || null, spName: origin.spName || null, spNo: (origin.spNo != null ? origin.spNo : null),
+  };
+  return c;
+}
+function gradeMul(g) { return g ? GRADE_MULT[g] : 1.0; }
+function effStats(c) {
+  const st = Object.assign({}, c.stats);
+  if (c.parts) {
+    st.hp = Math.round(st.hp * gradeMul(c.parts[1]));
+    st.atk = Math.round(st.atk * gradeMul(c.parts[2]));
+    st.def = Math.round(st.def * gradeMul(c.parts[3]));
+    st.spd = Math.round(st.spd * (gradeMul(c.parts[0]) + gradeMul(c.parts[4])) / 2);
+  }
+  const lvm = 1 + 0.05 * ((c.lv || 1) - 1);
+  for (const k of ["hp", "atk", "def", "spd"]) st[k] = Math.max(3, Math.round(st[k] * lvm));
+  return st;
+}
+function gainExp(c, n) {
+  if (!c) return 0;
+  c.exp = (c.exp || 0) + n;
+  let ups = 0;
+  while (c.exp >= (c.lv || 1) * 50) { c.exp -= (c.lv || 1) * 50; c.lv = (c.lv || 1) + 1; ups++; }
+  if (ups) c.maxhp = effStats(c).hp;
+  return ups;
+}
+function dexKey(g) { return [g.body, g.head, g.horn, g.wing, g.tail, g.legs, g.pattern, Math.round(g.hue / 30)].join("-"); }
+function registerDex(c) {
+  if (c.spNo == null) return;
+  const k = "sp" + c.spNo;
+  if (!S.dex[k]) S.dex[k] = { sp: c.spNo, count: 0 };
+  S.dex[k].count++;
+}
+function addCreature(c) { S.box.push(c); registerDex(c); save(); }
+
+/* 化石から復活 */
+function reviveFromFossil(f) {
+  const sp = SPECIES[f.sp];
+  const g = Object.assign({}, sp.genes);
+  // 部位ボーナス：あたま化石は角が育ちやすい等
+  if (f.part === 0 && Math.random() < 0.5) g.horn = Math.min(3, g.horn + 1);
+  if (f.part === 4 && Math.random() < 0.5) g.tail = Math.min(2, g.tail + 1);
+  if (f.part === 3 && Math.random() < 0.5) g.legs = Math.min(2, g.legs + 1);
+  // クリーニングの出来が良いほど突然変異（レア色など）
+  const mutP = f.grade === "S" ? 0.30 : f.grade === "A" ? 0.18 : 0.08;
+  if (Math.random() < mutP) g.hue = (g.hue + pick([60, 120, 180, 300])) % 360;
+  if (Math.random() < mutP) g.pattern = ri(4);
+  const mult = GRADE_MULT[f.grade];
+  const c = makeCreature(g, sp.el, sp.skills, { kind: "復活", grade: f.grade, mult, name: sp.nm, spName: sp.nm, spNo: f.sp });
+  c.stats = statsFromGenes(g, sp.bias, mult); c.maxhp = c.stats.hp;
+  return c;
+}
+/* 遺伝子組み換え（ドナー方式）：部位の特性（評価）と特技をドナーからベースへ渡す。ドナーは消える。見た目（genes）は変わらない */
+function partGrade(c, pi) { return (c.parts && c.parts[pi]) || c.grade || "C"; }
+function recombine(base, donor, part, skillId) {
+  if (!base.parts) base.parts = {};
+  const beforeStats = effStats(base);
+  const beforeGrade = partGrade(base, part);
+  base.parts[part] = partGrade(donor, part);
+  let skillName = null;
+  if (skillId && !base.skills.includes(skillId)) {
+    if (base.skills.length < 4) base.skills.push(skillId);
+    else base.skills[base.skills.length - 1] = skillId;
+    skillName = skillById(skillId).nm;
+  }
+  S.box = S.box.filter(c => c.id !== donor.id);
+  base.maxhp = effStats(base).hp;
+  return { beforeStats, afterStats: effStats(base), beforeGrade, afterGrade: base.parts[part], skillName };
+}
+
+/* ============ 描画（遺伝子→見た目） ============ */
+function drawCreature(cv, g, size, fossil) {
+  const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+  const cx = W / 2, cy = H / 2 + H * 0.04;
+  const u = (W / 200) * (g.size || 1); // 基本単位
+  const hue = g.hue;
+  const bodyC = fossil ? "#f2e7c8" : `hsl(${hue},62%,52%)`;
+  const darkC = fossil ? "#c9ad7e" : `hsl(${hue},60%,38%)`;
+  const lightC = fossil ? "#fbf5e2" : `hsl(${hue},75%,72%)`;
+  ctx.lineWidth = 3 * u; ctx.strokeStyle = "rgba(60,35,10,.55)"; ctx.lineJoin = "round";
+  const ell = (x, y, rx, ry, fill) => { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); ctx.stroke(); };
+  // 尾
+  if (g.tail === 1) { ctx.beginPath(); ctx.moveTo(cx + 52 * u, cy + 18 * u); ctx.quadraticCurveTo(cx + 95 * u, cy + 30 * u, cx + 88 * u, cy - 8 * u); ctx.lineWidth = 11 * u; ctx.strokeStyle = darkC; ctx.stroke(); ctx.lineWidth = 3 * u; ctx.strokeStyle = "rgba(60,35,10,.55)"; }
+  if (g.tail === 2) { ctx.beginPath(); ctx.arc(cx + 78 * u, cy + 16 * u, 15 * u, 0.4, 5.2); ctx.lineWidth = 9 * u; ctx.strokeStyle = darkC; ctx.stroke(); ctx.lineWidth = 3 * u; ctx.strokeStyle = "rgba(60,35,10,.55)"; }
+  // 翼
+  if (g.wing >= 1) {
+    const ws = g.wing === 2 ? 1.35 : 0.85;
+    for (const sgn of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(cx + sgn * 30 * u, cy - 22 * u);
+      ctx.quadraticCurveTo(cx + sgn * (78 * ws) * u, cy - (66 * ws) * u, cx + sgn * (62 * ws) * u, cy - 2 * u);
+      ctx.quadraticCurveTo(cx + sgn * 38 * u, cy - 12 * u, cx + sgn * 30 * u, cy - 22 * u);
+      ctx.fillStyle = lightC; ctx.fill(); ctx.stroke();
+    }
+  }
+  // 脚
+  if (g.legs === 0) { ell(cx - 26 * u, cy + 52 * u, 13 * u, 8 * u, darkC); ell(cx + 26 * u, cy + 52 * u, 13 * u, 8 * u, darkC); }
+  if (g.legs === 1) { ell(cx - 28 * u, cy + 58 * u, 12 * u, 10 * u, darkC); ell(cx + 28 * u, cy + 58 * u, 12 * u, 10 * u, darkC); }
+  if (g.legs === 2 && !fossil) { ctx.beginPath(); ctx.ellipse(cx, cy + 62 * u, 34 * u, 7 * u, 0, 0, Math.PI * 2); ctx.fillStyle = "rgba(90,120,160,.35)"; ctx.fill(); }
+  // 体
+  let bw = 56, bh = 48;
+  if (g.body === 1) { bw = 74; bh = 36; }
+  if (g.body === 2) { bw = 46; bh = 60; }
+  if (g.body === 3) { bw = 64; bh = 54; }
+  ell(cx, cy + 8 * u, bw * u, bh * u, bodyC);
+  // 模様
+  ctx.save();
+  ctx.beginPath(); ctx.ellipse(cx, cy + 8 * u, bw * u, bh * u, 0, 0, Math.PI * 2); ctx.clip();
+  if (g.pattern === 1) { ctx.fillStyle = "rgba(255,255,255,.35)"; for (let i = -2; i < 3; i++) ctx.fillRect(cx - bw * u, cy + i * 20 * u, bw * 2 * u, 8 * u); }
+  if (g.pattern === 2) { ctx.fillStyle = "rgba(255,255,255,.45)"; for (const [dx, dy] of [[-30, -8], [8, 14], [30, -16], [-8, 30], [22, 34]]) { ctx.beginPath(); ctx.arc(cx + dx * u, cy + dy * u, 7 * u, 0, Math.PI * 2); ctx.fill(); } }
+  if (g.pattern === 3) { const gr = ctx.createLinearGradient(cx, cy - bh * u, cx, cy + bh * u); gr.addColorStop(0, "rgba(255,255,255,.55)"); gr.addColorStop(1, "rgba(0,0,0,.12)"); ctx.fillStyle = gr; ctx.fillRect(cx - bw * u, cy - bh * u, bw * 2 * u, bh * 2 * u); }
+  ctx.restore();
+  ell(cx, cy + 22 * u, bw * 0.52 * u, bh * 0.42 * u, lightC); // お腹
+  // 頭（体の上部に重ねる）
+  const hy = cy - bh * 0.52 * u;
+  let hw = 34, hh = 30;
+  if (g.head === 1) { hw = 36; hh = 30; }
+  if (g.head === 2) { hw = 28; hh = 34; }
+  if (g.head === 1) {
+    ctx.beginPath(); ctx.rect(cx - hw * u, hy - hh * u, hw * 2 * u, hh * 2 * u); ctx.fillStyle = bodyC; ctx.fill(); ctx.stroke();
+  } else if (g.head === 2) {
+    ctx.beginPath(); ctx.moveTo(cx - hw * u, hy + hh * u); ctx.lineTo(cx, hy - hh * 1.25 * u); ctx.lineTo(cx + hw * u, hy + hh * u); ctx.closePath(); ctx.fillStyle = bodyC; ctx.fill(); ctx.stroke();
+  } else {
+    ell(cx, hy, hw * u, hh * u, bodyC);
+  }
+  // 角
+  ctx.fillStyle = "#fdf6e3";
+  if (g.horn === 1) { ctx.beginPath(); ctx.moveTo(cx - 7 * u, hy - hh * u); ctx.lineTo(cx, hy - hh * u - 26 * u); ctx.lineTo(cx + 7 * u, hy - hh * u); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  if (g.horn === 2) { for (const sgn of [-1, 1]) { ctx.beginPath(); ctx.moveTo(cx + sgn * 20 * u - 6 * u, hy - hh * 0.8 * u); ctx.lineTo(cx + sgn * 30 * u, hy - hh * u - 22 * u); ctx.lineTo(cx + sgn * 20 * u + 6 * u, hy - hh * 0.8 * u); ctx.closePath(); ctx.fill(); ctx.stroke(); } }
+  if (g.horn === 3) { ctx.beginPath(); for (let i = 0; i < 5; i++) { const px = cx + (i - 2) * 13 * u; ctx.moveTo(px - 6 * u, hy - hh * u + 2 * u); ctx.lineTo(px, hy - hh * u - (i % 2 ? 14 : 22) * u); ctx.lineTo(px + 6 * u, hy - hh * u + 2 * u); } ctx.fillStyle = "#fbbf24"; ctx.fill(); ctx.stroke(); }
+  // 顔
+  ctx.fillStyle = "#2b2118";
+  for (const sgn of [-1, 1]) { ctx.beginPath(); ctx.arc(cx + sgn * 13 * u, hy - 2 * u, 4.6 * u, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(cx + sgn * 13 * u - 1.5 * u, hy - 3.5 * u, 1.7 * u, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill(); ctx.fillStyle = "#2b2118"; }
+  ctx.beginPath(); ctx.arc(cx, hy + 10 * u, 7 * u, 0.15 * Math.PI, 0.85 * Math.PI); ctx.lineWidth = 2.6 * u; ctx.strokeStyle = "#2b2118"; ctx.stroke();
+  // ほっぺ
+  if (!fossil) {
+    ctx.fillStyle = "rgba(255,120,120,.5)";
+    for (const sgn of [-1, 1]) { ctx.beginPath(); ctx.arc(cx + sgn * 24 * u, hy + 7 * u, 5.5 * u, 0, Math.PI * 2); ctx.fill(); }
+  }
+}
+function creatureCanvas(g, px, fossil) {
+  const cv = document.createElement("canvas");
+  cv.width = px; cv.height = px;
+  cv.style.width = px + "px"; cv.style.height = px + "px";
+  drawCreature(cv, g, px, fossil);
+  return cv;
+}
+</script>
+<script>
+"use strict";
+/* ============ 画面遷移 ============ */
+const $ = id => document.getElementById(id);
+function show(v) {
+  document.querySelectorAll(".view").forEach(el => el.classList.toggle("on", el.id === "v-" + v));
+  document.querySelectorAll("#tabbar button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+  if (v === "home") renderTop();
+  if (v === "lab") renderLab();
+  if (v === "rock") { renderRocks(); }
+  if (v === "box") renderBox();
+  if (v === "breed") renderBreed();
+  if (v === "dex") renderDex();
+  $("main").scrollTop = 0;
+}
+document.querySelectorAll("#tabbar button").forEach(b => b.addEventListener("click", () => show(b.dataset.v)));
+function openModal(html) { $("modalBox").innerHTML = html; $("modal").classList.add("on"); }
+function closeModal() { $("modal").classList.remove("on"); }
+$("modal").addEventListener("click", e => { if (e.target === $("modal")) closeModal(); });
+
+/* ============ 演出（v12） ============ */
+function fxSparks(n, colors) {
+  const fx = $("fx");
+  const cx = fx.clientWidth / 2, cy = fx.clientHeight * 0.36;
+  for (let i = 0; i < n; i++) {
+    const s = document.createElement("div");
+    s.className = "spark";
+    s.style.background = pick(colors);
+    const ang = Math.random() * Math.PI * 2, dist = rnd(70, 175);
+    s.style.setProperty("--dx", Math.cos(ang) * dist + "px");
+    s.style.setProperty("--dy", Math.sin(ang) * dist + "px");
+    s.style.left = cx + "px"; s.style.top = cy + "px";
+    fx.appendChild(s);
+    setTimeout(() => s.remove(), 850);
+  }
+}
+function fxClose() { const fx = $("fx"); fx.classList.remove("on"); fx.innerHTML = ""; fx.onclick = null; }
+function playGachaFx(rock, label) {
+  const fx = $("fx");
+  const R = RARITY[rock.rarity];
+  fx.innerHTML = `<div class="rays ${rock.rarity === 2 ? "r2" : rock.rarity === 1 ? "r1" : ""}"></div>
+    <div class="flash"></div>
+    <div class="fxRock">${R.ic}</div>
+    <div class="fxTitle"></div>
+    <div class="fxSub"></div>
+    <button class="btn big fxBtn">ゲット！</button>
+    <div class="hint">タップでスキップ</div>`;
+  fx.classList.add("on");
+  const rockEl = fx.querySelector(".fxRock");
+  const title = fx.querySelector(".fxTitle"), sub = fx.querySelector(".fxSub"), btn = fx.querySelector(".fxBtn");
+  let step = 0;
+  const timers = [];
+  const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+  const reveal = () => {
+    if (step >= 1) return;
+    step = 1;
+    rockEl.classList.remove("shake");
+    if (rock.rarity === 2) rockEl.classList.add("glow2");
+    else if (rock.rarity === 1) rockEl.classList.add("glow1");
+    fx.querySelector(".flash").classList.add("go");
+    se(rock.rarity >= 1 ? "win" : "break");
+    fxSparks(rock.rarity === 2 ? 26 : rock.rarity === 1 ? 16 : 8,
+      rock.rarity === 2 ? ["#f9a8d4", "#93c5fd", "#fde68a", "#a7f3d0"] : ["#fde68a", "#fff7cc", "#fbbf24"]);
+    title.textContent = `${label ? label + "：" : ""}${R.nm} ゲット！`;
+    sub.innerHTML = rock.rarity === 2 ? "すごい…虹色に輝いてる！中身が楽しみだね" : rock.rarity === 1 ? "おっ、光ってる！いいものが入ってそう" : "岩ストックに追加したよ。「岩・部位」タブで開けよう";
+    title.classList.add("showT"); sub.classList.add("showT"); btn.classList.add("showT");
+  };
+  rockEl.classList.add("drop");
+  later(() => { rockEl.classList.add("shake"); se("hammer"); }, 430);
+  later(() => se("sparkle"), 700);
+  later(reveal, rock.rarity === 2 ? 1500 : rock.rarity === 1 ? 1250 : 1000);
+  fx.onclick = () => { if (step === 0) { timers.forEach(clearTimeout); reveal(); } };
+  btn.addEventListener("click", e => { e.stopPropagation(); fxClose(); });
+}
+function playReviveFx(c, titleHtml, after) {
+  const fx = $("fx");
+  fx.innerHTML = `<div class="rays r1"></div>
+    <div class="flash"></div>
+    <div class="fxStage"></div>
+    <div class="fxTitle"></div>
+    <div class="fxSub"></div>
+    <button class="btn big fxBtn">やったー！</button>
+    <div class="hint">タップでスキップ</div>`;
+  fx.classList.add("on");
+  const stage = fx.querySelector(".fxStage");
+  const sil = creatureCanvas(c.genes, 215, true); sil.classList.add("sil");
+  const real = creatureCanvas(c.genes, 215, false); real.classList.add("real");
+  stage.appendChild(sil); stage.appendChild(real);
+  const title = fx.querySelector(".fxTitle"), sub = fx.querySelector(".fxSub"), btn = fx.querySelector(".fxBtn");
+  let step = 0;
+  const timers = [];
+  const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+  const reveal = () => {
+    if (step >= 1) return;
+    step = 1;
+    sil.style.display = "none";
+    real.classList.add("pop");
+    fx.querySelector(".flash").classList.add("go");
+    se("win");
+    fxSparks(22, ["#fde68a", "#a7f3d0", "#93c5fd", "#f9a8d4"]);
+    title.innerHTML = titleHtml;
+    sub.innerHTML = `${c.name} ／ ${ELNAME[c.el]}属性 ／ Lv${c.lv || 1}`;
+    title.classList.add("showT"); sub.classList.add("showT"); btn.classList.add("showT");
+  };
+  se("fossil");
+  later(() => se("sparkle"), 550);
+  later(reveal, 1200);
+  fx.onclick = () => { if (step === 0) { timers.forEach(clearTimeout); reveal(); } };
+  btn.addEventListener("click", e => { e.stopPropagation(); fxClose(); if (after) after(); });
+}
+
+/* ============ 岩システム（新仕様） ============ */
+const RARITY = [
+  { nm: "ふつうの岩", ic: "🪨", layers: 2, hard: 0.10 },
+  { nm: "光る岩", ic: "✨🪨", layers: 3, hard: 0.25 },
+  { nm: "虹色の岩", ic: "🌈🪨", layers: 4, hard: 0.40 },
+];
+const ROCK_POOL = SPECIES.map((sp, i) => (sp.recipe ? -1 : i)).filter(i => i >= 0);
+const GRADE_ORDER = ["C", "B", "A", "S"];
+let RK = { base: null, donor: null, part: -1, skill: null };
+function rollRock(minRarity) {
+  const p = Math.random();
+  let r = p < 0.10 ? 2 : p < 0.38 ? 1 : 0;
+  if (minRarity) r = Math.max(r, minRarity);
+  // 部位が集まりかけの種を優先して出す（100種でも復活にたどり着けるように）
+  const prog = ROCK_POOL.filter(i => PARTS.some((_, pi) => S.parts[partKey(i, pi)]));
+  const sp = (prog.length && Math.random() < 0.6) ? pick(prog) : pick(ROCK_POOL);
+  return { sp, part: ri(5), rarity: r };
+}
+function staminaRegen() {
+  if (!S.stamina) S.stamina = { cur: 30, last: Date.now() };
+  const now = Date.now();
+  const gain = Math.floor((now - (S.stamina.last || now)) / 120000);
+  if (gain > 0) {
+    S.stamina.cur = Math.min(30, S.stamina.cur + gain);
+    S.stamina.last = (S.stamina.last || now) + gain * 120000;
+    if (S.stamina.cur >= 30) S.stamina.last = now;
+  }
+}
+function spendStamina(n) {
+  staminaRegen();
+  if (S.stamina.cur < n) return false;
+  S.stamina.cur -= n; save();
+  return true;
+}
+function rankTier() { const p = S.rankPt || 0; return p >= 250 ? 4 : p >= 150 ? 3 : p >= 80 ? 2 : p >= 30 ? 1 : 0; }
+function rankName() { return ["見習い", "ブロンズ", "シルバー", "ゴールド", "プラチナ"][rankTier()]; }
+function renderHeader() {
+  staminaRegen();
+  const rk = $("stRank"); if (rk) rk.textContent = rankName();
+  const sm = $("stStamina"); if (sm) sm.textContent = S.stamina ? S.stamina.cur : 30;
+  const hs = $("homeStats");
+  if (hs) hs.innerHTML = `ランク：<b>${rankName()}</b>（${S.rankPt || 0}pt）<br>スタミナ：⚡${S.stamina ? S.stamina.cur : 30}/30（岩開けに5消費・2分で1回復）<br>自動クリーニング券：🎫 ${S.tickets || 0}枚<br>岩ストック：${(S.rocks || []).length}個 ／ てもち：${S.box.length}体 ／ ずかん：${Object.keys(S.dex).length}種`;
+}
+function renderLab() { drawMascot("mascotCv2"); renderHeader(); }
+let QMODE = null;
+const MISSIONS = [
+  { id: "m1", txt: "生物を3体 てもちに入れる", goal: 3, cur: () => S.box.length, rw: 1 },
+  { id: "m2", txt: "ずかんを5種 登録する", goal: 5, cur: () => Object.keys(S.dex).length, rw: 1 },
+  { id: "m3", txt: "ランクポイントを50pt ためる", goal: 50, cur: () => S.rankPt || 0, rw: 2 },
+];
+function renderTop() {
+  renderHeader();
+  drawMascot("bannerMascot");
+  const st = S.stamina ? S.stamina.cur : 30;
+  const fill = $("hudStamFill"); if (fill) fill.style.width = (st / 30 * 100) + "%";
+  const snum = $("hudStamNum"); if (snum) snum.textContent = st + "/30";
+  const rnm = $("hudRankNm"); if (rnm) rnm.textContent = rankName();
+  const rpt = $("hudRankPt"); if (rpt) rpt.textContent = (S.rankPt || 0) + "pt";
+  const hr = $("hudRocks"); if (hr) hr.textContent = (S.rocks || []).length;
+  const ht = $("hudTickets"); if (ht) ht.textContent = S.tickets || 0;
+  const hp = $("hudParts"); if (hp) hp.textContent = Object.keys(S.parts || {}).length;
+  const gb = $("giftBdg"); if (gb) gb.style.display = S.giftTaken ? "none" : "flex";
+  const mb = $("misBdg"); if (mb) mb.style.display = MISSIONS.some(m => !(S.missionsClaimed || {})[m.id] && m.cur() >= m.goal) ? "flex" : "none";
+  const wrap = $("homeChar");
+  if (!wrap) return;
+  wrap.innerHTML = "";
+  const lead = S.box[0];
+  if (lead) {
+    const cv = creatureCanvas(lead.genes, 196);
+    cv.classList.add("bob");
+    cv.style.cursor = "pointer";
+    cv.addEventListener("click", () => show("box"));
+    wrap.appendChild(cv);
+    $("homeCharName").innerHTML = `<b>${lead.name}</b><br><span style="font-size:11px;">Lv${lead.lv || 1} ／ ${ELNAME[lead.el]}属性</span>`;
+  } else {
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = 64;
+    cv.style.width = "120px"; cv.style.height = "120px";
+    cv.classList.add("bob");
+    wrap.appendChild(cv);
+    drawMascot(cv);
+    $("homeCharName").innerHTML = `<b>モグ博士</b><br><span style="font-size:11px;">相棒はまだいない</span>`;
+  }
+}
+function openMissions() {
+  const rows = MISSIONS.map(m => {
+    const cur = Math.min(m.cur(), m.goal), done = m.cur() >= m.goal, claimed = !!((S.missionsClaimed || {})[m.id]);
+    const btn = claimed ? `<span class="tag" style="background:#d8c9a3;">受取済</span>` : done ? `<button class="btn small teal" onclick="claimMission('${m.id}')">🎟 券×${m.rw} 受取る</button>` : `<span class="tag">進行中</span>`;
+    return `<div style="text-align:left;margin:9px 0;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span style="font-size:13.5px;"><b>${m.txt}</b><br><span style="color:#a0865c;font-size:12px;">${cur} / ${m.goal}</span></span>${btn}</div><div style="height:8px;background:#efe3c2;border-radius:5px;margin-top:4px;overflow:hidden;"><div style="height:100%;width:${cur / m.goal * 100}%;background:linear-gradient(90deg,#fb923c,#f97316);"></div></div></div>`;
+  }).join("");
+  openModal(`<h3>📋 ミッション</h3>${rows}<button class="btn big" style="margin-top:10px;" onclick="closeModal()">閉じる</button>`);
+}
+function claimMission(id) {
+  const m = MISSIONS.find(x => x.id === id);
+  if (!m || m.cur() < m.goal || (S.missionsClaimed || {})[id]) return;
+  S.missionsClaimed = S.missionsClaimed || {};
+  S.missionsClaimed[id] = 1;
+  S.tickets = (S.tickets || 0) + m.rw;
+  se("win");
+  save(); renderTop();
+  openMissions();
+}
+function openNews() {
+  openModal(`<h3>🔔 お知らせ</h3><p style="font-size:14px;line-height:1.9;text-align:left;">🎪 <b>光る岩フェス</b>（あと3日・試作）<br>イベントクエストの報酬は光る岩以上が確定！<br><br>🧪 試作v14：ホームをモンスト風に一新。<br>ミッション達成で自動クリーニング券がもらえるよ。</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">閉じる</button>`);
+}
+function openGift() {
+  if (S.giftTaken) { openModal(`<h3>🎁 プレゼント</h3><p style="font-size:14px;line-height:1.8;">プレゼントは受取済みだよ。<br>新しいプレゼントが届いたらバッジで知らせるね。</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">閉じる</button>`); return; }
+  openModal(`<h3>🎁 プレゼントが届いてる！</h3><p style="font-size:14px;line-height:1.8;">試作記念：<b>自動クリーニング券 ×1</b></p><button class="btn big" style="margin-top:10px;" onclick="takeGift()">受取る</button>`);
+}
+function takeGift() {
+  if (S.giftTaken) return;
+  S.giftTaken = true;
+  S.tickets = (S.tickets || 0) + 1;
+  se("win"); save(); renderTop();
+  openModal(`<h3>🎁 受取った！</h3><p style="font-size:14px;line-height:1.8;">自動クリーニング券 ×1 を手に入れた。<br>（現在 ${S.tickets} 枚）</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">やったー</button>`);
+}
+function openRankInfo() {
+  const cur = rankName();
+  const rows = RANK_LADDER.map(r => `<div style="display:flex;justify-content:space-between;font-size:13.5px;padding:5px 2px;${r.name === cur ? "font-weight:900;color:#b45309;" : ""}"><span>${r.name}${r.name === cur ? "（現在）" : ""}</span><span>${r.at}pt〜</span></div>`).join("");
+  openModal(`<h3>🏅 ランク一覧</h3><div style="text-align:left;">${rows}</div><p style="font-size:12.5px;color:#a0865c;">バトル勝利で +10pt。敵もランクで強くなるよ。</p><button class="btn big" style="margin-top:8px;" onclick="closeModal()">閉じる</button>`);
+}
+function doGacha() {
+  const rock = rollRock(0);
+  S.rocks.push(rock); save(); renderHeader();
+  playGachaFx(rock);
+}
+$("btnGacha").addEventListener("click", doGacha);
+$("btnEventRock").addEventListener("click", () => show("home"));
+$("btnHomeGacha").addEventListener("click", doGacha);
+$("btnHomeRocks").addEventListener("click", () => show("rock"));
+$("btnHomeBreed").addEventListener("click", () => show("breed"));
+$("btnHomeDex").addEventListener("click", () => show("dex"));
+function goEventQuest() {
+  if (!S.box.length) { openModal(`<h3>⚔️ イベントクエスト</h3><p style="font-size:14px;line-height:1.8;">てもちがいないとクエストに行けない。<br>まず部位をそろえて1体復活させよう！</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">わかった</button>`); return; }
+  QMODE = "event";
+  show("battle");
+  startBattle();
+}
+$("btnQuestEvent").addEventListener("click", goEventQuest);
+$("btnQuestEvent2").addEventListener("click", goEventQuest);
+$("btnQuestGo").addEventListener("click", () => show("battle"));
+$("btnMissions").addEventListener("click", openMissions);
+$("btnNews").addEventListener("click", openNews);
+$("btnGift").addEventListener("click", openGift);
+$("btnRankInfo").addEventListener("click", openRankInfo);
+$("btnStamRefill").addEventListener("click", () => {
+  if (!S.stamina) S.stamina = { cur: 30, last: Date.now() };
+  S.stamina.cur = 30; S.stamina.last = Date.now();
+  se("sparkle"); save(); renderTop();
+  openModal(`<h3>⚡ スタミナ回復</h3><p style="font-size:14px;line-height:1.8;">スタミナが全回復した！（試作仕様）</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">よっしゃ</button>`);
+});
+function partKey(sp, part) { return sp + "-" + part; }
+function addPart(sp, part, grade) {
+  const k = partKey(sp, part);
+  const cur = S.parts[k];
+  if (!cur) { S.parts[k] = grade; return "new"; }
+  if (GRADE_ORDER.indexOf(grade) > GRADE_ORDER.indexOf(cur)) { S.parts[k] = grade; return "up"; }
+  return "keep";
+}
+function renderRocks() {
+  const el = $("rockList");
+  el.innerHTML = S.rocks.length ? "" : "<p class='desc'>岩がない。研究所で岩ガチャを引こう！</p>";
+  S.rocks.forEach((rock, i) => {
+    const R = RARITY[rock.rarity];
+    const card = document.createElement("div");
+    card.className = "card rockCard";
+    card.style.display = "block";
+    card.innerHTML = `<div style="display:flex;gap:10px;align-items:center;"><div class="rockIc">${R.ic}</div>
+      <div style="flex:1;"><div class="nm">${R.nm}</div><div class="meta">硬さ ${"★".repeat(rock.rarity + 1)} ／ 中身はレア度のみ判明<br>開けるのにスタミナ5</div></div></div>
+      <div class="autoRow">
+        <button class="btn teal" data-act="manual">🖌️ 手動で開ける</button>
+        <button class="btn sub" data-act="a1">🤖 自動① 無料</button>
+        <button class="btn sub" data-act="a2">🤖 自動② 券</button>
+        <button class="btn sub" data-act="a3">🤖 自動③ 券</button>
+      </div>`;
+    card.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+      const act = b.dataset.act;
+      if (act === "manual") {
+        if (!spendStamina(5)) { openModal(`<h3>⚡ スタミナ不足</h3><p style="font-size:14px;line-height:1.8;">岩を開けるにはスタミナ5が必要。<br>時間で回復するよ（2分で1）。</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">待つ</button>`); return; }
+        startClean(rock);
+      } else {
+        autoClean(i, Number(act[1]));
+      }
+    }));
+    el.appendChild(card);
+  });
+  renderParts();
+}
+function renderParts() {
+  const el = $("partList");
+  el.innerHTML = "";
+  const progList = ROCK_POOL.filter(spIdx => PARTS.some((_, pi) => S.parts[partKey(spIdx, pi)]));
+  if (!progList.length) el.innerHTML = "<p class='desc'>まだ部位が集まっていない。岩を開けて部位を集めよう！</p>";
+  progList.forEach(spIdx => {
+    const sp = SPECIES[spIdx];
+    const row = document.createElement("div");
+    row.className = "card partRow";
+    const chips = PARTS.map((pn, pi) => {
+      const g = S.parts[partKey(spIdx, pi)];
+      return `<span class="pchip ${g ? (g === "S" ? "gS" : "got") : ""}">${pn}${g ? ":" + GRADE_JP[g] : ""}</span>`;
+    }).join("");
+    const complete = PARTS.every((_, pi) => S.parts[partKey(spIdx, pi)]);
+    row.innerHTML = `<div style="flex:1;min-width:0;"><div class="nm" style="font-size:14px;">${sp.nm}</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">${chips}</div></div>`;
+    row.insertBefore(creatureCanvas(sp.genes, 44), row.firstChild);
+    if (complete) {
+      const b = document.createElement("button");
+      b.className = "btn teal"; b.style.flex = "none"; b.textContent = "✨ 復活！";
+      b.addEventListener("click", () => reviveParts(spIdx));
+      row.appendChild(b);
+    }
+    el.appendChild(row);
+  });
+}
+function autoClean(idx, stage) {
+  const rock = S.rocks[idx];
+  if (!rock) return;
+  if (stage >= 2 && (S.tickets || 0) <= 0) { openModal(`<h3>🎫 券がない</h3><p style="font-size:14px;line-height:1.8;">自動②③には自動クリーニング券が必要だよ。</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">閉じる</button>`); return; }
+  if (!spendStamina(5)) { openModal(`<h3>⚡ スタミナ不足</h3><p style="font-size:14px;line-height:1.8;">スタミナ5が必要。時間で回復するよ。</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">待つ</button>`); return; }
+  if (stage >= 2) S.tickets--;
+  const roll = Math.random() * 100;
+  let grade;
+  if (stage === 3) grade = "S";
+  else if (stage === 2) grade = roll < 25 ? "S" : roll < 70 ? "A" : "B";
+  else grade = roll < 5 ? "S" : roll < 30 ? "A" : roll < 80 ? "B" : "C";
+  S.rocks.splice(idx, 1);
+  const res = addPart(rock.sp, rock.part, grade);
+  save(); renderRocks(); renderHeader();
+  se("win");
+  const sp = SPECIES[rock.sp];
+  openModal(`<h3>🤖 自動クリーニング完了（${["", "①", "②", "③"][stage]}段階）</h3><p style="font-size:14px;line-height:1.9;"><b>${sp.nm}</b> の <b>${PARTS[rock.part]}</b> の化石<br>評価：<span class="grade">${grade}（${GRADE_JP[grade]}）</span>${res === "up" ? "<br>✨ 前より良い評価で更新！" : res === "keep" ? "<br>（良い方を保持）" : ""}</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">ゲット！</button>`);
+}
+function reviveParts(spIdx) {
+  const sp = SPECIES[spIdx];
+  const parts = {};
+  for (let pi = 0; pi < 5; pi++) { parts[pi] = S.parts[partKey(spIdx, pi)]; delete S.parts[partKey(spIdx, pi)]; }
+  const g = Object.assign({}, sp.genes);
+  const c = makeCreature(g, sp.el, sp.skills, { kind: "復活", name: sp.nm, spName: sp.nm, parts, spNo: spIdx });
+  c.stats = statsFromGenes(g, sp.bias, 1);
+  c.maxhp = effStats(c).hp;
+  addCreature(c);
+  save(); renderRocks();
+  playReviveFx(c, `✨ ${sp.nm} 復活！`, () => creatureModal(c, `✨ ${sp.nm} 復活！<br><span style="font-size:13px;">部位の評価がステータスに反映されてるよ</span>`));
+}
+function renderRkPanel() {
+  const el = $("breedLock");
+  if (!el) return;
+  const base = S.box.find(c => c.id === RK.base);
+  const donor = S.box.find(c => c.id === RK.donor);
+  if (!base || !donor) { el.innerHTML = ""; return; }
+  const hl = on => on ? "background:linear-gradient(180deg,#fbbf24,#f59e0b);color:#fff;" : "";
+  const partBtns = PARTS.map((pn, pi) => `<button class="btn sub" data-p="${pi}" style="${hl(RK.part === pi)}">${pn}：${GRADE_JP[partGrade(base, pi)]} → ${GRADE_JP[partGrade(donor, pi)]}</button>`).join("");
+  const skillChips = donor.skills.map(sid => `<button class="btn sub" data-sk="${sid}" style="${hl(RK.skill === sid)}">${skillById(sid).nm}${base.skills.includes(sid) ? "（習得済み）" : ""}</button>`).join("");
+  el.innerHTML = `<div class="card" style="display:block;margin-top:10px;"><div class="nm" style="font-size:14px;">🎯 渡す部位（1つだけ）</div>
+    <div class="meta">ドナー「${donor.name}」の部位の特性（評価）を、ベース「${base.name}」に渡す。</div>
+    <div class="lockRow">${partBtns}</div>
+    <div class="nm" style="font-size:14px;margin-top:8px;">✨ 渡す特技（任意・1つまで）</div>
+    <div class="lockRow">${skillChips}<button class="btn sub" data-sk="">渡さない</button></div>
+    <div class="meta" style="color:#b91c1c;">⚠️ 組み換えるとドナー「${donor.name}」は消えてしまいます</div></div>`;
+  el.querySelectorAll("[data-p]").forEach(btn => btn.addEventListener("click", () => { RK.part = Number(btn.dataset.p); renderBreed(); }));
+  el.querySelectorAll("[data-sk]").forEach(btn => btn.addEventListener("click", () => { RK.skill = btn.dataset.sk || null; renderBreed(); }));
+}
+
+/* ============ クリーニング（本家式） ============ */
+const CV = 340, CELL = 10, GN = CV / CELL; // 34x34グリッド
+let CL = null;
+function mkCanvas() { const c = document.createElement("canvas"); c.width = c.height = CV; return c; }
+function drawFossilArt(ctx) {
+  ctx.clearRect(0, 0, CV, CV);
+  ctx.save();
+  ctx.translate(170, 170);
+  ctx.fillStyle = "#fdf6e3"; ctx.strokeStyle = "#c9ab72"; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.ellipse(0, 0, 46, 30, 0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(30, 18); ctx.quadraticCurveTo(95, 55, 120, 30); ctx.quadraticCurveTo(95, 28, 40, -2); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(-95, -55, 17, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(-95, 55, 17, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-95, -55); ctx.lineTo(20, 0); ctx.lineTo(-95, 55); ctx.lineWidth = 20; ctx.strokeStyle = "#fdf6e3"; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-95, -55); ctx.lineTo(20, 0); ctx.lineTo(-95, 55); ctx.lineWidth = 3; ctx.strokeStyle = "#c9ab72"; ctx.stroke();
+  ctx.fillStyle = "#8a6a3b";
+  ctx.beginPath(); ctx.arc(8, -4, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+/* オリジナルマスコット「モグ博士」 */
+function drawMascot(id) {
+  const cv = (id && typeof id !== "string") ? id : $(id || "mascotCv"); if (!cv) return;
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, 64, 64);
+  ctx.lineWidth = 2; ctx.strokeStyle = "rgba(60,35,10,.5)";
+  ctx.fillStyle = "#a9743f";
+  ctx.beginPath(); ctx.arc(32, 38, 20, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#e8cba0";
+  ctx.beginPath(); ctx.ellipse(32, 46, 11, 8, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#f28bb4";
+  ctx.beginPath(); ctx.ellipse(32, 42, 5.5, 4, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#2b2118";
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(32 + s * 8, 34, 2.6, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = "#fff";
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(32 + s * 8 - 1, 33, 1, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = "#fbbf24";
+  ctx.beginPath(); ctx.arc(32, 31, 21, Math.PI, 0); ctx.fill(); ctx.stroke();
+  ctx.fillRect(9, 29, 46, 5); ctx.strokeRect(9, 29, 46, 5);
+  ctx.fillStyle = "#fff7cc";
+  ctx.beginPath(); ctx.arc(32, 17, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = "#2b2118"; ctx.lineWidth = 1.8;
+  ctx.beginPath(); ctx.arc(32, 47, 4, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+}
+function say(text, force) {
+  const now = Date.now();
+  if (!force && CL && CL.sayAt && now - CL.sayAt < 1600) return;
+  if (CL) CL.sayAt = now;
+  const el = $("mascotSay");
+  if (el) el.textContent = text;
+}
+function goodPop(text) {
+  const el = $("goodPop");
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
+  se("sparkle");
+}
+function startClean(rock) {
+  show("clean");
+  document.getElementById("app").classList.add("focus");
+  stopCleanTimers();
+  // 下地（台座）
+  const base = mkCanvas(); const bx = base.getContext("2d");
+  bx.fillStyle = "#d9c08d"; bx.fillRect(0, 0, CV, CV);
+  for (let i = 0; i < 500; i++) { bx.fillStyle = `rgba(140,105,55,${rnd(0.04, 0.12)})`; bx.beginPath(); bx.arc(rnd(0, CV), rnd(0, CV), rnd(1, 4), 0, Math.PI * 2); bx.fill(); }
+  // 化石アート＆マスク（復活する種の姿そのものを化石化して使う）
+  const fossilCv = mkCanvas();
+  drawCreature(fossilCv, SPECIES[rock.sp].genes, CV, true);
+  const fdata = fossilCv.getContext("2d").getImageData(0, 0, CV, CV).data;
+  const mask = new Uint8Array(GN * GN);
+  let fossilTotal = 0;
+  for (let gy = 0; gy < GN; gy++) for (let gx = 0; gx < GN; gx++) {
+    const px = ((gy * CELL + 5) * CV + (gx * CELL + 5)) * 4;
+    if (fdata[px + 3] > 90) { mask[gy * GN + gx] = 1; fossilTotal++; }
+  }
+  // 部位化石：部位の領域だけを残す
+  const inPart = (gx, gy) => {
+    const x = gx / GN, y = gy / GN;
+    switch (rock.part) {
+      case 0: return y < 0.42;
+      case 1: return y >= 0.33 && y < 0.74 && x > 0.22 && x < 0.78;
+      case 2: return (x < 0.30 || x > 0.70) && y < 0.78;
+      case 3: return y >= 0.68;
+      case 4: return x > 0.60 && y >= 0.40;
+    }
+    return true;
+  };
+  {
+    let kept = 0;
+    const m2 = new Uint8Array(GN * GN);
+    for (let gy = 0; gy < GN; gy++) for (let gx = 0; gx < GN; gx++) {
+      const i = gy * GN + gx;
+      if (mask[i] && inPart(gx, gy)) { m2[i] = 1; kept++; }
+    }
+    if (kept >= 12) { for (let i = 0; i < GN * GN; i++) mask[i] = m2[i]; fossilTotal = kept; }
+  }
+  // X線用シルエット
+  const xrayCv = mkCanvas(); const xx = xrayCv.getContext("2d");
+  xx.drawImage(fossilCv, 0, 0);
+  for (let gy = 0; gy < GN; gy++) for (let gx = 0; gx < GN; gx++) if (!mask[gy * GN + gx]) xx.clearRect(gx * CELL, gy * CELL, CELL, CELL);
+  xx.globalCompositeOperation = "source-in";
+  xx.fillStyle = "rgba(56,224,255,0.9)"; xx.fillRect(0, 0, CV, CV);
+  // 岩と粉
+  const rockArr = new Uint8Array(GN * GN);
+  const shade = new Float32Array(GN * GN);
+  const RR = RARITY[rock.rarity];
+  for (let i = 0; i < GN * GN; i++) { rockArr[i] = Math.max(1, RR.layers - (mask[i] ? 1 : 0) + (Math.random() < RR.hard ? 1 : 0)); shade[i] = rnd(-14, 14); }
+  CL = {
+    base, fossilCv, xrayCv, mask, fossilTotal, nonTotal: GN * GN - fossilTotal,
+    rock: rockArr, dust: new Float32Array(GN * GN), shade,
+    rockCv: mkCanvas(), dustCv: mkCanvas(),
+    dmg: 0, tool: "hammer", xray: 2, xrayUntil: 0, flashUntil: 0,
+    startAt: Date.now(), finished: false, rockObj: rock,
+    ptr: { down: false, x: 0, y: 0 }, drillLast: new Int32Array(GN * GN),
+    cellStress: new Float32Array(GN * GN), grazeUntil: 0,
+    tickId: null, drillId: null, score: 0, parts: { rock: 0, clean: 0, around: 0, pen: 0 },
+  };
+  for (let i = 0; i < GN * GN; i++) { paintRock(i); }
+  composite();
+  selectCTool("hammer");
+  $("xrayN").textContent = CL.xray;
+  CL.flags = {}; CL.sayAt = 0; CL.dmgSayAt = 0; CL.tickN = 0; CL.exposedFrac = 0;
+  drawMascot();
+  $("cleanRockInfo").textContent = `${RARITY[rock.rarity].ic} ${RARITY[rock.rarity].nm}（硬さ${"★".repeat(rock.rarity + 1)}）`;
+  const pw = $("progCvWrap");
+  pw.innerHTML = ""; pw.appendChild(creatureCanvas(SPECIES[rock.sp].genes, 54, true));
+  say("まずはX線で形を覚えるのがコツ！", true);
+  updateCleanUI();
+  CL.tickId = setInterval(cleanTick, 100);
+  bindCleanPointer();
+}
+function stopCleanTimers() {
+  if (CL) { if (CL.tickId) clearInterval(CL.tickId); if (CL.drillId) clearInterval(CL.drillId); }
+}
+function paintRock(i) {
+  const ctx = CL.rockCv.getContext("2d");
+  const x = (i % GN) * CELL, y = Math.floor(i / GN) * CELL;
+  ctx.clearRect(x, y, CELL, CELL);
+  const t = CL.rock[i];
+  if (!t) return;
+  const s = CL.shade[i];
+  ctx.fillStyle = t >= 2 ? `rgb(${138 + s},${90 + s * 0.7},${43 + s * 0.5})` : `rgb(${178 + s},${132 + s * 0.7},${82 + s * 0.5})`;
+  ctx.fillRect(x, y, CELL, CELL);
+  ctx.fillStyle = "rgba(255,255,255,0.10)";
+  ctx.fillRect(x, y, CELL, 2);
+  ctx.fillStyle = "rgba(60,35,5,0.14)";
+  const sx = (i * 37) % 7, sy = (i * 53) % 7;
+  ctx.fillRect(x + 1 + sx, y + 2 + sy, 2, 2);
+  ctx.fillRect(x + 8 - sx, y + 8 - sy, 2, 2);
+}
+function paintDust(i) {
+  const ctx = CL.dustCv.getContext("2d");
+  const x = (i % GN) * CELL, y = Math.floor(i / GN) * CELL;
+  ctx.clearRect(x, y, CELL, CELL);
+  const d = CL.dust[i];
+  if (d < 0.05) return;
+  ctx.fillStyle = `rgba(219,192,142,${Math.min(0.30, d * 0.32)})`;
+  ctx.beginPath(); ctx.arc(x + CELL / 2, y + CELL / 2, CELL * 0.72, 0, Math.PI * 2); ctx.fill();
+}
+function composite() {
+  const cv = $("cleanCv"); if (!cv || !CL) return;
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, CV, CV);
+  ctx.drawImage(CL.base, 0, 0);
+  ctx.drawImage(CL.fossilCv, 0, 0);
+  ctx.drawImage(CL.rockCv, 0, 0);
+  ctx.drawImage(CL.dustCv, 0, 0);
+  const now = Date.now();
+  if (now < CL.xrayUntil) { ctx.globalAlpha = 0.85; ctx.drawImage(CL.xrayCv, 0, 0); ctx.globalAlpha = 1; }
+  if (now < CL.flashUntil) {
+    ctx.save(); ctx.globalCompositeOperation = "source-atop";
+    ctx.globalAlpha = 0.35; ctx.drawImage(CL.xrayCv, 0, 0); ctx.restore();
+    ctx.globalAlpha = 1;
+    ctx.save(); ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "rgba(239,68,68,0.20)"; ctx.fillRect(0, 0, CV, CV); ctx.restore();
+  } else if (now < (CL.grazeUntil || 0)) {
+    ctx.save(); ctx.fillStyle = "rgba(250,204,21,0.13)"; ctx.fillRect(0, 0, CV, CV); ctx.restore();
+  }
+}
+function cellsIn(cx, cy, r) {
+  const out = [];
+  const gx0 = Math.max(0, Math.floor((cx - r) / CELL)), gx1 = Math.min(GN - 1, Math.floor((cx + r) / CELL));
+  const gy0 = Math.max(0, Math.floor((cy - r) / CELL)), gy1 = Math.min(GN - 1, Math.floor((cy + r) / CELL));
+  for (let gy = gy0; gy <= gy1; gy++) for (let gx = gx0; gx <= gx1; gx++) {
+    const ccx = gx * CELL + 5, ccy = gy * CELL + 5;
+    if ((ccx - cx) ** 2 + (ccy - cy) ** 2 <= r * r) out.push(gy * GN + gx);
+  }
+  return out;
+}
+function dustSplash(cx, cy, amt) {
+  for (const i of cellsIn(cx, cy, 30)) {
+    const nd = Math.min(1, CL.dust[i] + amt * rnd(0.6, 1.1));
+    if (Math.abs(nd - CL.dust[i]) > 0.03) { CL.dust[i] = nd; paintDust(i); }
+  }
+}
+function addDamage(n) {
+  CL.dmg = Math.min(100, CL.dmg + n);
+  CL.flashUntil = Date.now() + 220;
+  if (navigator.vibrate) try { navigator.vibrate(50); } catch (e) {}
+  const now = Date.now();
+  if (now - (CL.dmgSayAt || 0) > 3500) {
+    CL.dmgSayAt = now;
+    say("あぶない！化石に当たってるよ。ドリルで慎重に！", true);
+  }
+}
+function grazeFeedback() {
+  CL.grazeUntil = Date.now() + 200;
+  const now = Date.now();
+  if (now - (CL.grazeSayAt || 0) > 4000) {
+    CL.grazeSayAt = now;
+    say("かすった！セーフ…でも気をつけて", true);
+  }
+}
+function hammerAt(x, y) {
+  se("hammer");
+  let dmgCells = 0, removed = 0;
+  for (const i of cellsIn(x, y, 36)) {
+    if (CL.rock[i] > 0) { CL.rock[i]--; paintRock(i); dustSplash(x, y, 0.16); removed++; }
+    else if (CL.mask[i]) dmgCells++;
+  }
+  // 化石の耐久度：かすった程度（3マス以下）はノーダメージ。しっかり当てた分だけ傷つく
+  if (dmgCells >= 4) addDamage(Math.min(6, (dmgCells - 3) * 0.55));
+  else if (dmgCells > 0) grazeFeedback();
+  else if (removed >= 11) { goodPop("GREAT!"); say(pick(["すごい！一気に割れたね！", "お見事！その調子！"])); }
+  else if (removed >= 6) { goodPop("GOOD!"); if (Math.random() < 0.5) say(pick(["いい調子！", "うまい！化石の近くはドリルでね"])); }
+  composite(); updateCleanUI();
+}
+function drillBAt(x, y) {
+  se("hammer");
+  let dmgCells = 0, removed = 0;
+  for (const i of cellsIn(x, y, 20)) {
+    if (CL.rock[i] > 0) { CL.rock[i] = Math.max(0, CL.rock[i] - 2); paintRock(i); dustSplash(x, y, 0.10); removed++; }
+    else if (CL.mask[i]) dmgCells++;
+  }
+  if (dmgCells >= 6) addDamage(Math.min(5, (dmgCells - 5) * 0.5));
+  else if (dmgCells > 0) grazeFeedback();
+  else if (removed >= 11) goodPop("GOOD!");
+  composite(); updateCleanUI();
+}
+function drillAt(x, y) {
+  const now = Date.now();
+  let changed = false, grazed = false;
+  for (const i of cellsIn(x, y, 14)) {
+    if (now - CL.drillLast[i] < 230) continue;
+    CL.drillLast[i] = now;
+    if (CL.rock[i] > 0) { CL.rock[i]--; paintRock(i); changed = true; }
+    else if (CL.mask[i]) {
+      // 耐久度：かすりはストレスが溜まるだけ。同じ場所を削り続けると初めて傷つく
+      CL.cellStress[i] += 0.55;
+      if (CL.cellStress[i] >= 1) { CL.cellStress[i] = 0.35; addDamage(0.45); changed = true; }
+      else grazed = true;
+    }
+  }
+  if (grazed && !changed) grazeFeedback();
+  if (changed) { dustSplash(x, y, 0.05); composite(); updateCleanUI(); }
+  else if (grazed) composite();
+}
+function airAt(x, y) {
+  let changed = false;
+  for (const i of cellsIn(x, y, 46)) {
+    if (CL.dust[i] > 0.02) { CL.dust[i] = 0; paintDust(i); changed = true; }
+  }
+  if (changed) composite();
+}
+function moveRing(x, y) {
+  if (!CL) return;
+  const cv = $("cleanCv");
+  const ring = $("cursorRing");
+  const scale = cv.clientWidth / CV;
+  const r = CL.tool === "hammer" ? 36 : CL.tool === "drillB" ? 20 : CL.tool === "drill" ? 14 : 46;
+  ring.style.display = "block";
+  ring.style.width = ring.style.height = (r * 2 * scale) + "px";
+  ring.style.left = (cv.offsetLeft + x * scale) + "px";
+  ring.style.top = (cv.offsetTop + y * scale) + "px";
+}
+function bindCleanPointer() {
+  const cv = $("cleanCv");
+  const pos = e => {
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (CV / r.width), y: (e.clientY - r.top) * (CV / r.height) };
+  };
+  cv.onpointerdown = e => {
+    if (!CL || CL.finished) return;
+    const p = pos(e); CL.ptr = { down: true, x: p.x, y: p.y };
+    cv.setPointerCapture(e.pointerId);
+    if (CL.tool === "hammer") hammerAt(p.x, p.y);
+    else if (CL.tool === "drill") { drillAt(p.x, p.y); CL.drillId = setInterval(() => { if (CL.ptr.down) drillAt(CL.ptr.x, CL.ptr.y); }, 95); }
+    else if (CL.tool === "drillB") { drillBAt(p.x, p.y); CL.drillId = setInterval(() => { if (CL.ptr.down) drillBAt(CL.ptr.x, CL.ptr.y); }, 160); }
+    else if (CL.tool === "air") airAt(p.x, p.y);
+  };
+  cv.onpointermove = e => {
+    const p = pos(e);
+    moveRing(p.x, p.y);
+    if (!CL || !CL.ptr.down) return;
+    CL.ptr.x = p.x; CL.ptr.y = p.y;
+    if (CL.tool === "air") airAt(p.x, p.y);
+  };
+  cv.onpointerleave = () => { $("cursorRing").style.display = "none"; };
+  const up = () => { if (CL) { CL.ptr.down = false; if (CL.drillId) { clearInterval(CL.drillId); CL.drillId = null; } } };
+  cv.onpointerup = cv.onpointercancel = up;
+}
+function calcScore() {
+  let exposed = 0, cleanExposed = 0, cleared = 0;
+  for (let i = 0; i < GN * GN; i++) {
+    if (CL.mask[i]) { if (CL.rock[i] === 0) { exposed++; if (CL.dust[i] < 0.3) cleanExposed++; } }
+    else if (CL.rock[i] === 0) cleared++;
+  }
+  CL.exposedFrac = exposed / CL.fossilTotal;
+  const rock = 60 * exposed / CL.fossilTotal;
+  const clean = 25 * cleanExposed / CL.fossilTotal;
+  const around = 15 * cleared / CL.nonTotal;
+  const pen = CL.dmg * 0.6;
+  CL.parts = { rock: Math.round(rock), clean: Math.round(clean), around: Math.round(around), pen: Math.round(pen) };
+  CL.score = Math.max(0, Math.min(100, Math.round(rock + clean + around - pen)));
+}
+function updateCleanUI() {
+  calcScore();
+  $("cleanScore").textContent = CL.score;
+  $("timeGauge").style.width = Math.round((CL.exposedFrac || 0) * 100) + "%";
+  $("cleanDmgGauge").style.width = (100 - CL.dmg) + "%";
+  $("progFill").style.width = Math.round((CL.exposedFrac || 0) * 100) + "%";
+  $("progPct").textContent = `発掘率 ${Math.round((CL.exposedFrac || 0) * 100)}%`;
+  $("cleanInfo").textContent = `🦴 耐久度 ${100 - Math.round(CL.dmg)}%（岩${CL.parts.rock}・仕上${CL.parts.clean}・周${CL.parts.around}・減点-${CL.parts.pen}）`;
+}
+function cleanTick() {
+  if (!CL || CL.finished) return;
+  if (Date.now() < CL.xrayUntil || CL.xrayUntil && Date.now() - CL.xrayUntil < 150) composite();
+  updateCleanUI();
+  CL.tickN = (CL.tickN || 0) + 1;
+  // かすりストレスは時間で回復（押し続けなければ傷にならない）
+  for (let i = 0; i < GN * GN; i++) if (CL.cellStress[i] > 0) CL.cellStress[i] = Math.max(0, CL.cellStress[i] - 0.045);
+  if (CL.tickN % 10 === 0 && CL.flags) {
+    let dustSum = 0;
+    for (let i = 0; i < GN * GN; i++) if (CL.mask[i]) dustSum += CL.dust[i];
+    const dustAvg = dustSum / CL.fossilTotal;
+    if (dustAvg > 0.38 && !CL.flags.dust) { CL.flags.dust = 1; say("粉がたまってきたよ。エアで飛ばすと仕上がりアップ！"); }
+    if (dustAvg < 0.2) CL.flags.dust = 0;
+    if (CL.exposedFrac >= 0.5 && !CL.flags.half) { CL.flags.half = 1; say("半分出てきた！あせらず丁寧に"); }
+    if (CL.exposedFrac >= 0.9 && !CL.flags.n90) { CL.flags.n90 = 1; say("あと少し！仕上げはドリルとエアで"); }
+  }
+}
+function selectCTool(t) {
+  if (CL) CL.tool = t;
+  for (const [id, name] of [["ctHammer", "hammer"], ["ctDrillB", "drillB"], ["ctDrill", "drill"], ["ctAir", "air"]]) {
+    $(id).classList.toggle("on", t === name);
+  }
+}
+$("ctHammer").addEventListener("click", () => selectCTool("hammer"));
+$("ctDrill").addEventListener("click", () => selectCTool("drill"));
+$("ctDrillB").addEventListener("click", () => selectCTool("drillB"));
+$("ctAir").addEventListener("click", () => selectCTool("air"));
+$("ctXray").addEventListener("click", () => {
+  if (!CL || CL.finished || CL.xray <= 0) return;
+  CL.xray--; $("xrayN").textContent = CL.xray;
+  CL.xrayUntil = Date.now() + 1200;
+  composite();
+});
+$("btnCleanRetry").addEventListener("click", () => { if (CL && CL.rockObj) startClean(CL.rockObj); });
+$("btnFinish").addEventListener("click", () => finishClean(false));
+function finishClean(auto) {
+  if (!CL || CL.finished) return;
+  CL.finished = true;
+  se("win");
+  document.getElementById("app").classList.remove("focus");
+  stopCleanTimers();
+  calcScore();
+  const score = CL.score;
+  const scoreGrade = score >= 90 ? "S" : score >= 78 ? "A" : score >= 60 ? "B" : "C";
+  const cap = CL.dmg < 15 ? "S" : CL.dmg < 35 ? "A" : CL.dmg < 60 ? "B" : "C";
+  const order = ["S", "A", "B", "C"];
+  const grade = order[Math.max(order.indexOf(scoreGrade), order.indexOf(cap))];
+  const rock = CL.rockObj;
+  const idx = S.rocks.indexOf(rock);
+  if (idx >= 0) S.rocks.splice(idx, 1);
+  const p = CL.parts;
+  const res = addPart(rock.sp, rock.part, grade);
+  save();
+  show("rock");
+  const sp = SPECIES[rock.sp];
+  const complete = PARTS.every((_, pi) => S.parts[partKey(rock.sp, pi)]);
+  const prog = PARTS.map((_, pi) => S.parts[partKey(rock.sp, pi)] ? "✅" : "⬜").join("");
+  openModal(`<h3>✨ 骨を取り出した！</h3>
+    <p style="font-size:14px;line-height:1.9;">スコア <b>${score}</b>点（岩${p.rock}・仕上${p.clean}・周${p.around}・減点-${p.pen}）<br>
+    <b>${sp.nm}</b> の <b>${PARTS[rock.part]}</b> の化石<br>評価：<span class="grade">${grade}（${GRADE_JP[grade]}）</span>${res === "up" ? "<br>✨ 前より良い評価で更新！" : res === "keep" ? "<br>（同じ部位は良い方を保持）" : ""}<br>
+    部位そろい具合：${prog}<br>
+    ${complete ? "🎉 <b>部位が全部そろった！「岩・部位」タブから復活できるよ！</b>" : "部位を5つそろえると復活できるよ"}</p>
+    <button class="btn big" style="margin-top:10px;" onclick="closeModal()">やった！</button>`);
+}
+
+/* ============ てもち・組み換えリスト ============ */
+function sbar(label, v, max, color) {
+  return `<div class="sbar"><span>${label}</span><div class="strack"><div style="width:${Math.min(100, Math.round(v / max * 100))}%;background-color:${color};"></div></div><b>${v}</b></div>`;
+}
+function creatureCard(c, opts) {
+  opts = opts || {};
+  const div = document.createElement("div");
+  div.className = "card creature" + (opts.selected ? " sel" : "") + (c.grade === "S" ? " gold" : c.grade === "A" ? " silver" : "");
+  const cv = creatureCanvas(c.genes, 84);
+  div.appendChild(cv);
+  const es = effStats(c);
+  const inf = document.createElement("div");
+  inf.style.flex = "1";
+  inf.style.minWidth = "0";
+  inf.innerHTML = `<div class="nm">${c.name}</div>
+    <div class="meta">${ELNAME[c.el]}属性 ／ ${c.origin} ／ Lv${c.lv || 1}</div><div class="expbar"><div style="width:${Math.min(100, Math.round((c.exp || 0) / ((c.lv || 1) * 50) * 100))}%"></div></div>
+    ${sbar("HP", es.hp, 160, "#4ade80")}
+    ${sbar("こうげき", es.atk, 50, "#f87171")}
+    ${sbar("ぼうぎょ", es.def, 50, "#60a5fa")}
+    ${sbar("すばやさ", es.spd, 45, "#fbbf24")}
+    <div class="chips">${c.skills.map(s => `<span class="chip el">${skillById(s).nm}</span>`).join("")}
+    <span class="chip">${PARTNAME.horn[c.genes.horn]}</span><span class="chip">${PARTNAME.wing[c.genes.wing]}</span><span class="chip">${PARTNAME.pattern[c.genes.pattern]}</span></div>${c.parts ? `<div class="chips">${PARTS.map((pn, pi) => `<span class="chip">${pn}:${c.parts[pi] ? GRADE_JP[c.parts[pi]] : "-"}</span>`).join("")}</div>` : ""}`;
+  div.appendChild(inf);
+  if (opts.onClick) div.addEventListener("click", () => opts.onClick(c));
+  return div;
+}
+function renderBox() {
+  const el = $("boxList");
+  el.innerHTML = S.box.length ? "" : "<p class='desc'>まだいない。部位をそろえて復活させよう！</p>";
+  S.box.forEach(c => el.appendChild(creatureCard(c, {
+    onClick: () => { RK.base = c.id; if (RK.donor === c.id) RK.donor = null; RK.part = -1; RK.skill = null; show("breed"); },
+  })));
+}
+function renderBreed() {
+  const el = $("breedList");
+  el.innerHTML = S.box.length ? "" : "<p class='desc'>てもちがいないと組み換えできない。</p>";
+  S.box.forEach(c => {
+    const card = creatureCard(c, {
+      selected: RK.base === c.id || RK.donor === c.id,
+      onClick: () => rkSelect(c),
+    });
+    if (RK.base === c.id || RK.donor === c.id) {
+      const badge = document.createElement("div");
+      badge.className = "chip";
+      badge.style.cssText = "align-self:flex-start;font-weight:900;" + (RK.base === c.id ? "background:#f59e0b;color:#fff;" : "background:#8b5cf6;color:#fff;");
+      badge.textContent = RK.base === c.id ? "🎯 ベース" : "🧬 ドナー";
+      card.appendChild(badge);
+    }
+    el.appendChild(card);
+  });
+  const btn = $("btnBreed");
+  const base = S.box.find(c => c.id === RK.base);
+  const donor = S.box.find(c => c.id === RK.donor);
+  btn.disabled = !(base && donor && RK.part >= 0);
+  btn.textContent = !base ? "🧬 組み換える（ベースをえらんでね）" : !donor ? "🧬 組み換える（ドナーをえらんでね）" : RK.part < 0 ? "🧬 組み換える（渡す部位をえらんでね）" : `🧬 ${base.name} に ${PARTS[RK.part]} の遺伝子を渡す！`;
+  renderRkPanel();
+}
+function rkSelect(c) {
+  if (RK.base === c.id) { RK.base = null; RK.part = -1; RK.skill = null; }
+  else if (RK.donor === c.id) { RK.donor = null; RK.part = -1; RK.skill = null; }
+  else if (!RK.base) RK.base = c.id;
+  else RK.donor = c.id;
+  renderBreed();
+}
+$("btnBreed").addEventListener("click", () => {
+  const base = S.box.find(c => c.id === RK.base);
+  const donor = S.box.find(c => c.id === RK.donor);
+  if (!base || !donor || RK.part < 0) return;
+  const partName = PARTS[RK.part];
+  const donorName = donor.name;
+  const res = recombine(base, donor, RK.part, RK.skill);
+  RK = { base: base.id, donor: null, part: -1, skill: null };
+  save();
+  show("breed");
+  se("win");
+  openModal(`<h3>🧬 組み換え完了！</h3>
+    <div id="modalCv" style="display:flex;justify-content:center;margin:8px 0;"></div>
+    <div style="font-weight:900;font-size:18px;">${base.name}</div>
+    <p style="font-size:13px;color:#7a6748;line-height:1.8;">${partName}の特性：${GRADE_JP[res.beforeGrade]} → <b>${GRADE_JP[res.afterGrade]}</b><br>
+    HP ${res.beforeStats.hp}→${res.afterStats.hp} ／ こうげき ${res.beforeStats.atk}→${res.afterStats.atk} ／ ぼうぎょ ${res.beforeStats.def}→${res.afterStats.def} ／ すばやさ ${res.beforeStats.spd}→${res.afterStats.spd}<br>
+    ${res.skillName ? `✨ 特技「${res.skillName}」を受け継いだ！<br>` : ""}見た目はそのまま。ドナーの ${donorName} は消えました…ありがとう。</p>
+    <button class="btn big" style="margin-top:10px;" onclick="closeModal()">わかった</button>`);
+  $("modalCv").appendChild(creatureCanvas(base.genes, 170));
+});
+function creatureModal(c, title) {
+  openModal(`<h3>${title}</h3>
+    <div id="modalCv" style="display:flex;justify-content:center;margin:8px 0;"></div>
+    <div style="font-weight:900;font-size:18px;">${c.name}</div>
+    <p style="font-size:13px;color:#7a6748;line-height:1.7;">${ELNAME[c.el]}属性 ／ Lv${c.lv || 1} ／ HP ${effStats(c).hp} ／ こうげき ${effStats(c).atk} ／ ぼうぎょ ${effStats(c).def} ／ すばやさ ${effStats(c).spd}<br>
+    とくぎ：${c.skills.map(s => skillById(s).nm).join("、")}</p>
+    <button class="btn big" style="margin-top:10px;" onclick="closeModal()">やったー！</button>`);
+  $("modalCv").appendChild(creatureCanvas(c.genes, 170));
+}
+
+/* ============ 図鑑 ============ */
+function renderDex() {
+  const grid = $("dexGrid");
+  grid.innerHTML = "";
+  const found = Object.keys(S.dex).length;
+  const dc = $("dexCount");
+  if (dc) dc.textContent = `（発見 ${found} / 100）`;
+  SPECIES.forEach((sp, i) => {
+    const d = S.dex["sp" + i];
+    const cell = document.createElement("div");
+    cell.className = "dexcell";
+    cell.appendChild(creatureCanvas(sp.genes, 76, !d));
+    const nm = document.createElement("div"); nm.className = "nm";
+    nm.textContent = d ? `No.${String(sp.no).padStart(3, "0")} ${sp.nm}` : `No.${String(sp.no).padStart(3, "0")} ？？？`;
+    cell.appendChild(nm);
+    const ct = document.createElement("div"); ct.className = "ct";
+    ct.textContent = d ? `${ELNAME[sp.el]}／${TRIBES[sp.tribe]} ×${d.count}` : "みはっけん";
+    cell.appendChild(ct);
+    cell.addEventListener("click", () => dexModal(i));
+    grid.appendChild(cell);
+  });
+}
+function dexModal(i) {
+  const sp = SPECIES[i];
+  const d = S.dex["sp" + i];
+  openModal(`<h3>No.${String(sp.no).padStart(3, "0")} ${d ? sp.nm : "？？？"}</h3>
+    <div id="modalCv" style="display:flex;justify-content:center;margin:8px 0;"></div>
+    <p style="font-size:13px;color:#7a6748;line-height:1.8;">${d ? `${ELNAME[sp.el]}属性 ／ ${TRIBES[sp.tribe]}<br>${DEXDESC[i]}<br>発見数 ×${d.count}` : "まだ見つけていないリバモン。復活させると記録されるよ。"}</p>
+    <button class="btn big" style="margin-top:10px;" onclick="closeModal()">閉じる</button>`);
+  $("modalCv").appendChild(creatureCanvas(sp.genes, 170, !d));
+}
+
+/* ============ バトル ============ */
+let B = null;
+function enemyTeam() {
+  const team = [];
+  const avg = S.box.length ? S.box.slice(0, 3).reduce((s, c) => s + c.stats.hp, 0) / Math.min(3, S.box.length) : 50;
+  for (let i = 0; i < 3; i++) {
+    const sp = SPECIES[ri(SPECIES.length)];
+    const c = makeCreature(Object.assign({}, sp.genes), sp.el, sp.skills, { kind: "野生", name: sp.nm, spName: sp.nm, spNo: SPECIES.indexOf(sp) });
+    c.stats = statsFromGenes(c.genes, sp.bias, rnd(0.9, 1.05) * (1 + rankTier() * 0.10)); c.maxhp = c.stats.hp;
+    team.push(c);
+  }
+  return team;
+}
+function startBattle() {
+  if (!S.box.length) { alert("てもちがいない！部位をそろえて復活させよう"); return; }
+  const mine = S.box.slice(0, 3).map(c => { const es = effStats(c); return { ref: c, name: c.name + " Lv" + (c.lv || 1), genes: c.genes, el: c.el, skills: c.skills.slice(), stats: es, hp: es.hp, maxhp: es.hp, auto: false }; });
+  const foe = enemyTeam().map(c => ({ ref: c, name: c.name, genes: c.genes, el: c.el, skills: c.skills.slice(), stats: c.stats, hp: c.stats.hp, maxhp: c.stats.hp, auto: true }));
+  B = { mine, foe, turn: 1, phase: "cmd", cmdIdx: 0, cmds: {}, over: false };
+  renderBattle();
+  logLine(`野生のチームが あらわれた！`, "sys");
+  nextCmd();
+}
+function brow(u, active) {
+  const d = document.createElement("div");
+  d.className = "brow" + (u.hp <= 0 ? " dead" : "") + (active ? " active" : "");
+  d.appendChild(creatureCanvas(u.genes, 52));
+  const pct = Math.max(0, Math.round(u.hp / u.maxhp * 100));
+  d.insertAdjacentHTML("beforeend", `<div class="inf"><div class="nm">${u.name}</div>
+    <div class="hp ${pct <= 30 ? "low" : ""}"><div style="width:${pct}%"></div></div>
+    <div class="hpnum">HP ${Math.max(0, u.hp)} / ${u.maxhp}</div></div>`);
+  return d;
+}
+function renderBattle() {
+  const area = $("battleArea");
+  area.innerHTML = "";
+  const foeBox = document.createElement("div"); foeBox.className = "bside";
+  B.foe.forEach(u => foeBox.appendChild(brow(u, false)));
+  area.appendChild(foeBox);
+  const vs = document.createElement("div"); vs.className = "vs"; vs.textContent = `― ターン ${B.turn} ―`;
+  area.appendChild(vs);
+  const myBox = document.createElement("div"); myBox.className = "bside";
+  B.mine.forEach((u, i) => myBox.appendChild(brow(u, B.phase === "cmd" && B.cmdIdx === i && u.hp > 0)));
+  area.appendChild(myBox);
+  const log = document.createElement("div"); log.id = "blog"; area.appendChild(log);
+  const cmds = document.createElement("div"); cmds.className = "cmds"; cmds.id = "cmds"; area.appendChild(cmds);
+  const back = document.createElement("button"); back.className = "btn sub big"; back.style.marginTop = "8px";
+  back.textContent = "🏳️ にげる（バトル終了）";
+  back.addEventListener("click", () => { B = null; show("battle"); resetBattleView(); });
+  area.appendChild(back);
+  if (B.logHtml) $("blog").innerHTML = B.logHtml;
+}
+function resetBattleView() {
+  $("battleArea").innerHTML = `<p class="desc">野生の生物チームと3対3のターン制バトル。「さくせん」で自動、「コマンド」で自分で指示できる。</p>
+    <button class="btn big" id="btnBattleStart">⚔️ バトル開始！</button>
+    <p class="note">勝つと経験値とランクポイントが手に入る。<br>てもちが0体だと戦えないよ。</p>`;
+  $("battleArea").addEventListener("click", e => { if (e.target && e.target.id === "btnBattleStart") { QMODE = null; startBattle(); } });
+}
+function logLine(html, cls) {
+  if (!B) return;
+  B.logHtml = (B.logHtml || "") + `<div class="${cls || ""}">${html}</div>`;
+  const el = $("blog");
+  if (el) { el.innerHTML = B.logHtml; el.scrollTop = el.scrollHeight; }
+}
+function aliveIdx(team) { return team.map((u, i) => u.hp > 0 ? i : -1).filter(i => i >= 0); }
+function nextCmd() {
+  if (!B || B.over) return;
+  while (B.cmdIdx < B.mine.length && (B.mine[B.cmdIdx].hp <= 0 || B.mine[B.cmdIdx].auto)) {
+    if (B.mine[B.cmdIdx].hp > 0) B.cmds[B.cmdIdx] = autoCmd(B.mine[B.cmdIdx], B.foe);
+    B.cmdIdx++;
+  }
+  renderBattle();
+  if (B.cmdIdx >= B.mine.length) { execTurn(); return; }
+  const u = B.mine[B.cmdIdx];
+  const cmds = $("cmds");
+  cmds.innerHTML = "";
+  const mk = (label, fn, cls) => {
+    const b = document.createElement("button"); b.className = "btn " + (cls || ""); b.textContent = label;
+    b.addEventListener("click", fn); cmds.appendChild(b);
+  };
+  mk(`⚔️ こうげき`, () => setCmd({ type: "atk", skill: "bite" }));
+  u.skills.filter(s => s !== "bite").forEach(s => mk(`✨ ${skillById(s).nm}`, () => setCmd({ type: "skill", skill: s }), "teal"));
+  mk(`🤖 さくせん（自動）`, () => { u.auto = true; B.cmds[B.cmdIdx] = autoCmd(u, B.foe); B.cmdIdx++; nextCmd(); }, "sub");
+  logLine(`${u.name} のコマンド？`, "sys");
+}
+function setCmd(c) { B.cmds[B.cmdIdx] = c; B.cmdIdx++; nextCmd(); }
+function autoCmd(u, foes) {
+  const strong = u.skills.filter(s => skillById(s).el === u.el || skillById(s).pw >= 1.3);
+  return { type: "skill", skill: strong.length && Math.random() < 0.75 ? pick(strong) : "bite" };
+}
+function effMult(atkEl, defEl) {
+  if (atkEl < 0) return 1;
+  const c = ELCHART[atkEl];
+  return defEl === c.win ? 1.5 : defEl === c.lose ? 0.7 : 1;
+}
+function execTurn() {
+  if (!B) return;
+  B.phase = "exec";
+  B.foe.forEach((u, i) => { if (u.hp > 0) B.cmds["f" + i] = autoCmd(u, B.mine); });
+  const order = [];
+  B.mine.forEach((u, i) => { if (u.hp > 0) order.push({ u, cmd: B.cmds[i], foes: B.foe }); });
+  B.foe.forEach((u, i) => { if (u.hp > 0) order.push({ u, cmd: B.cmds["f" + i], foes: B.mine }); });
+  order.sort((a, b) => b.u.stats.spd - a.u.stats.spd);
+  let delay = 350;
+  for (const act of order) {
+    setTimeout(() => doAction(act), delay);
+    delay += 620;
+  }
+  setTimeout(endTurn, delay + 150);
+}
+function doAction(act) {
+  if (!B || B.over) return;
+  const { u, cmd, foes } = act;
+  if (u.hp <= 0) return;
+  const targets = foes.filter(t => t.hp > 0);
+  if (!targets.length) return;
+  const t = targets.reduce((m, x) => x.hp < m.hp ? x : m, targets[0]); // 一番弱っている相手を狙う
+  const sk = skillById(cmd.skill || "bite");
+  if (sk.heal) {
+    const allies = (foes === B.foe ? B.mine : B.foe).filter(x => x.hp > 0);
+    const at = sk.tgt === "self" ? u : allies.reduce((m2, x) => (x.hp / x.maxhp) < (m2.hp / m2.maxhp) ? x : m2, allies[0]);
+    const amt = Math.round(at.maxhp * sk.heal);
+    at.hp = Math.min(at.maxhp, at.hp + amt);
+    logLine(`${u.name} の ${sk.nm}！ ${at === u ? "自分の" : at.name + " の"}HPが ${amt} 回復！`, "good");
+    renderBattle(); se("win");
+    return;
+  }
+  if (sk.acc && Math.random() * 100 >= sk.acc) {
+    logLine(`${u.name} の ${sk.nm}！ しかし はずれた！`);
+    renderBattle();
+    return;
+  }
+  const m = effMult(sk.el, t.el);
+  const dmg = Math.max(1, Math.round(u.stats.atk * sk.pw * m * rnd(0.85, 1.15) * 22 / (t.stats.def + 18)));
+  t.hp -= dmg;
+  if (sk.drain) { const h = Math.max(1, Math.round(dmg * sk.drain)); u.hp = Math.min(u.maxhp, u.hp + h); logLine(`${u.name} は ${h} のHPをすいとった！`, "good"); }
+  logLine(`${u.name} の ${sk.nm}！ ${t.name} に <span class="dmg">${dmg} ダメージ</span>${m > 1 ? "（効果ばつぐん！）" : m < 1 ? "（いまひとつ）" : ""}`);
+  if (t.hp <= 0) logLine(`${t.name} は たおれた！`, "good");
+  renderBattle();
+  se("hit");
+  const sides = document.querySelectorAll("#battleArea .bside");
+  const hitRow = sides[foes === B.foe ? 0 : 1] && sides[foes === B.foe ? 0 : 1].children[foes.indexOf(t)];
+  if (hitRow) {
+    hitRow.classList.add("hit");
+    const pop = document.createElement("span");
+    pop.className = "dmgpop"; pop.textContent = dmg;
+    hitRow.appendChild(pop);
+    setTimeout(() => pop.remove(), 900);
+  }
+  checkEnd();
+}
+function checkEnd() {
+  if (!B || B.over) return false;
+  const mw = aliveIdx(B.mine).length, fw = aliveIdx(B.foe).length;
+  if (fw && mw) return false;
+  B.over = true;
+  if (mw) {
+    S.rankPt += 10;
+    const ups = [];
+    for (const u of B.mine) { if (gainExp(u.ref, 34)) ups.push(`${u.ref.name} Lv${u.ref.lv}！`); }
+    save(); renderHeader();
+    let questNote = "";
+    if (QMODE === "event") {
+      const rock = rollRock(1);
+      S.rocks.push(rock);
+      questNote = `<br>🎁 イベント報酬：<b>${RARITY[rock.rarity].nm}</b> を岩ストックに追加！`;
+      QMODE = null;
+      save();
+    }
+    logLine(`🎉 勝利！経験値+34／ランクポイント+10 ${ups.join(" ")}`, "good");
+    setTimeout(() => { openModal(`<h3>🎉 バトル勝利！</h3><p style="font-size:14px;line-height:1.8;">経験値とランクポイントをゲット！<br>現在ランク：<b>${rankName()}</b>（${S.rankPt}pt）<br>${ups.length ? "レベルアップ：" + ups.join("、") : "レベルアップまであと少し！"}${questNote}</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">よっしゃ！</button>`); }, 700);
+  } else {
+    for (const u of B.mine) gainExp(u.ref, 10);
+    save();
+    logLine(`💦 全滅…。てもちは回復した（試作版） 経験値+10`, "sys");
+    setTimeout(() => { openModal(`<h3>💦 まけちゃった…</h3><p style="font-size:14px;line-height:1.8;">てもちは全回復したよ（試作版の優しさ）。<br>組み換えで強化して再挑戦しよう！</p><button class="btn big" style="margin-top:10px;" onclick="closeModal()">つぎがんばる</button>`); }, 700);
+  }
+  return true;
+}
+function endTurn() {
+  if (!B || B.over) return;
+  if (checkEnd()) return;
+  B.turn++; B.cmdIdx = 0; B.cmds = {}; B.phase = "cmd";
+  nextCmd();
+}
+$("btnBattleStart").addEventListener("click", startBattle);
+
+/* ============ 初期化 ============ */
+window.__kaseki = { get S() { return S; }, rollRock, startClean, autoClean, reviveParts, recombine, reviveFromFossil, startBattle, effStats, effMult, partGrade, get RK() { return RK; }, setRK(v) { RK = v; } };
+$("muteBtn").textContent = S.mute ? "🔇" : "🔊";
+$("muteBtn").addEventListener("click", () => {
+  S.mute = !S.mute; save();
+  $("muteBtn").textContent = S.mute ? "🔇" : "🔊";
+  if (!S.mute) se("sparkle");
+});
+renderHeader();
+renderTop();
+save();
+</script>
+</body>
+</html>
