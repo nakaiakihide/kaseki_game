@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ゴールデンジャパン（仮）試作v6</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif; background:#0b1026; color:#fff; min-height:100vh; overflow-x:hidden; }
+  header { position:sticky; top:0; z-index:50; background:linear-gradient(180deg,#1a2150,#12173a); border-bottom:2px solid #d4af37; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; }
+  .logo { font-weight:900; font-size:19px; letter-spacing:1px; background:linear-gradient(180deg,#fff2b0,#d4af37 60%,#9a7b1e); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .wallet { display:flex; align-items:center; gap:8px; }
+  .coinbox { background:#05081a; border:1px solid #d4af37; border-radius:999px; padding:5px 14px; font-weight:800; color:#ffd94d; font-size:16px; min-width:120px; text-align:right; }
+  .bonusbtn { background:linear-gradient(180deg,#ffdf6b,#e0a81c); color:#4a3200; border:none; border-radius:999px; padding:7px 12px; font-weight:900; font-size:13px; cursor:pointer; }
+  .bonusbtn:disabled { opacity:.4; }
+  main { padding:14px; max-width:560px; margin:0 auto; }
+  .view { display:none; }
+  .view.active { display:block; }
+  /* ロビー */
+  .lobby-hero { text-align:center; padding:16px 6px 8px; }
+  .lobby-hero h1 { font-size:23px; font-weight:900; color:#ffd94d; text-shadow:0 2px 10px rgba(212,175,55,.5); }
+  .lobby-hero p { font-size:12.5px; color:#aab; margin-top:6px; }
+  .gamerow { display:flex; gap:14px; overflow-x:auto; scroll-snap-type:x mandatory; padding:14px 2px 18px; -webkit-overflow-scrolling:touch; scrollbar-width:none; }
+  .gamerow::-webkit-scrollbar { display:none; }
+  .gamecard { flex:0 0 78%; scroll-snap-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-height:230px; text-align:center; border:2px solid rgba(212,175,55,.55); border-radius:20px; padding:22px 16px; cursor:pointer; color:#fff; }
+  .gamecard .ic { font-size:74px; line-height:1; }
+  .gamecard .tt { font-size:22px; font-weight:900; }
+  .gamecard .ds { font-size:13px; color:#ccd; margin-top:3px; line-height:1.6; }
+  .gamecard .play { margin-top:8px; background:linear-gradient(180deg,#ffdf6b,#e0a81c); color:#3a2800; font-weight:900; font-size:14px; border-radius:999px; padding:8px 22px; }
+  .dots { display:flex; justify-content:center; gap:7px; padding-bottom:6px; }
+  .dots span { width:8px; height:8px; border-radius:50%; background:#39427c; transition:background .2s; }
+  .dots span.on { background:#ffd94d; }
+  .gc-slot { background:linear-gradient(135deg,#5b1160,#2a0a3d); }
+  .gc-fish { background:linear-gradient(135deg,#0b4d6e,#062a45); }
+  .gc-horse { background:linear-gradient(135deg,#14532d,#0a2e1a); }
+  .backbtn { background:none; border:1px solid #667; color:#ccd; border-radius:10px; padding:7px 14px; font-size:13px; cursor:pointer; margin-bottom:12px; }
+  h2.gametitle { font-size:20px; font-weight:900; margin:2px 0 10px; }
+  /* 共通パーツ */
+  .panel { background:#141a3d; border:1px solid #2c3568; border-radius:16px; padding:14px; }
+  .betrow { display:flex; gap:8px; align-items:center; margin:12px 0; flex-wrap:wrap; }
+  .betrow .lbl { font-size:13px; color:#aab; }
+  .betbtn { background:#232a57; color:#fff; border:1px solid #46539c; border-radius:10px; padding:8px 14px; font-weight:800; cursor:pointer; font-size:14px; }
+  .betbtn.sel { background:#d4af37; color:#231a00; border-color:#ffe98a; }
+  .bigbtn { display:block; width:100%; background:linear-gradient(180deg,#ffdf6b,#e0a81c); color:#3a2800; border:none; border-radius:14px; padding:15px; font-size:18px; font-weight:900; cursor:pointer; box-shadow:0 4px 0 #8a6408; }
+  .bigbtn:active { transform:translateY(2px); box-shadow:0 2px 0 #8a6408; }
+  .bigbtn:disabled { opacity:.45; box-shadow:none; }
+  .msg { min-height:26px; text-align:center; font-weight:800; font-size:16px; color:#ffd94d; margin:10px 0 2px; }
+  .msg.lose { color:#8fa3ff; }
+  /* スロット */
+  .slotmachine { background:linear-gradient(180deg,#3d0a46,#22052b); border:3px solid #d4af37; border-radius:20px; padding:16px 12px; }
+  .reels { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .reel { background:#fff8ea; border-radius:12px; height:74px; display:flex; align-items:center; justify-content:center; font-size:44px; box-shadow:inset 0 0 0 3px #d9c58a; }
+  .reel.mid { box-shadow:inset 0 0 0 3px #d4af37, 0 0 12px rgba(255,217,77,.55); }
+  .paytable { font-size:12.5px; color:#cdd; line-height:1.9; margin-top:10px; }
+  .paytable b { color:#ffd94d; }
+  /* フィッシング */
+  #fishCanvas { width:100%; background:linear-gradient(180deg,#0a4d6e,#062a45 70%,#041c30); border:2px solid #2e7ea6; border-radius:16px; touch-action:none; display:block; }
+  .fishinfo { font-size:12.5px; color:#cdd; line-height:1.9; margin-top:10px; }
+  /* 競馬 */
+  .horseopt { display:flex; align-items:center; gap:10px; width:100%; background:#1a2148; border:2px solid #39427c; color:#fff; border-radius:12px; padding:10px 12px; margin:6px 0; cursor:pointer; text-align:left; }
+  .horseopt.sel { border-color:#ffd94d; background:#2a3160; }
+  .horseopt .hn { font-size:22px; }
+  .horseopt .nm { font-weight:800; font-size:15px; }
+  .horseopt .od { margin-left:auto; color:#ffd94d; font-weight:900; }
+  .track { margin-top:12px; }
+  .lane { display:flex; align-items:center; gap:8px; margin:5px 0; }
+  .lane .no { width:20px; text-align:center; font-weight:900; color:#ffd94d; }
+  .lane .rail { flex:1; background:#0d3a22; border-radius:999px; height:30px; position:relative; overflow:hidden; border:1px solid #1f6b3f; }
+  .lane .runner { position:absolute; left:0; top:1px; font-size:24px; transition:none; }
+  .lane .fin { position:absolute; right:6px; top:4px; font-size:15px; opacity:.8; }
+  footer { text-align:center; color:#667; font-size:11px; padding:18px 10px 26px; }
+</style>
+<style>
+  /* ===== v3：明るいカジノテーマ ===== */
+  body { background:
+    radial-gradient(900px 480px at 50% -80px, rgba(255,93,162,.75), rgba(255,93,162,0) 60%),
+    radial-gradient(700px 500px at 90% 30%, rgba(255,180,0,.28), rgba(255,180,0,0) 60%),
+    linear-gradient(180deg,#7e1e8f 0%,#4a1470 45%,#2a0a4a 100%);
+    background-attachment:fixed; }
+  header { background:linear-gradient(180deg,#f2263f,#b30f27); border-bottom:3px solid #ffd94d; box-shadow:0 3px 18px rgba(255,60,90,.55); position:sticky; }
+  header::after { content:""; position:absolute; left:0; right:0; bottom:-9px; height:9px;
+    background-image:radial-gradient(circle,#fff3a0 2.6px, rgba(255,243,160,0) 3.6px);
+    background-size:24px 9px; background-repeat:repeat-x; animation:bulbs 1s steps(2) infinite; }
+  @keyframes bulbs { 50% { opacity:.35; } }
+  .coinbox { background:#2a0505; border:2px solid #ffd94d; box-shadow:0 0 10px rgba(255,217,77,.6); }
+  .lobby-hero h1 { font-size:27px; color:#ffe98a; text-shadow:0 0 14px rgba(255,180,0,.9), 0 3px 0 #a3122a; }
+  .lobby-hero p { color:#f3d9ff; }
+  .gamecard { border:3px solid #ffd94d; box-shadow:0 0 18px rgba(255,180,0,.45), 0 10px 24px rgba(0,0,0,.35); }
+  .gc-slot  { background:linear-gradient(160deg,#ff4d8d,#8e2de2); }
+  .gc-fish  { background:linear-gradient(160deg,#00c6ff,#0057d9); }
+  .gc-horse { background:linear-gradient(160deg,#38ef7d,#0a9d6e); }
+  .gamecard .ds { color:#fff; opacity:.92; }
+  .gamecard .play { box-shadow:0 3px 0 #8a6408, 0 0 12px rgba(255,230,130,.8); }
+  .dots span { background:rgba(255,255,255,.35); }
+  .dots span.on { background:#ffd94d; box-shadow:0 0 8px rgba(255,217,77,.9); }
+  h2.gametitle { color:#ffe98a; text-shadow:0 0 12px rgba(255,180,0,.75), 0 2px 0 #7a0d20; }
+  .backbtn { border-color:rgba(255,255,255,.65); color:#fff; background:rgba(255,255,255,.12); }
+  .panel { background:rgba(255,250,235,.96); border:2px solid #ffd94d; color:#4a3b12; box-shadow:0 6px 18px rgba(0,0,0,.25); }
+  .paytable { color:#5a4a22; } .paytable b { color:#d18d00; }
+  .fishinfo { color:#5a4a22; } .fishinfo b { color:#d18d00; }
+  .betbtn { background:rgba(255,255,255,.16); border-color:rgba(255,255,255,.55); }
+  .betbtn.sel { background:linear-gradient(180deg,#ffdf6b,#e0a81c); color:#3a2800; border-color:#fff3a0; box-shadow:0 0 10px rgba(255,217,77,.7); }
+  .betrow .lbl { color:#f3d9ff; }
+  .bigbtn { box-shadow:0 4px 0 #8a6408, 0 0 18px rgba(255,200,60,.65); }
+  .msg { text-shadow:0 1px 6px rgba(0,0,0,.45); }
+  .msg.lose { color:#d7deff; }
+  .slotmachine { background:linear-gradient(180deg,#ff2e63,#a3122a); border:3px solid #ffd94d; box-shadow:0 0 0 3px #b8860b, 0 0 26px rgba(255,180,0,.75), 0 12px 26px rgba(0,0,0,.4); }
+  #fishCanvas { background:linear-gradient(180deg,#29b6f6,#0277bd 70%,#01579b); border-color:#ffd94d; box-shadow:0 0 16px rgba(80,200,255,.5); }
+  .horseopt { background:rgba(255,255,255,.14); border-color:rgba(255,255,255,.4); }
+  .horseopt.sel { background:rgba(255,217,77,.22); border-color:#ffd94d; box-shadow:0 0 12px rgba(255,217,77,.55); }
+  .lane .rail { background:#177245; border-color:#2fbf71; }
+  .lane .no { color:#ffe98a; }
+  footer { color:#cdb2e8; }
+  /* ===== v4：タブ＋空き台 ===== */
+  .tabbar { display:flex; gap:8px; margin:6px 0 2px; }
+  .tabbtn { flex:1; padding:11px 4px; border-radius:12px; border:2px solid rgba(255,255,255,.4); background:rgba(255,255,255,.12); color:#fff; font-weight:900; font-size:14.5px; cursor:pointer; }
+  .tabbtn.sel { background:linear-gradient(180deg,#ffdf6b,#e0a81c); color:#3a2800; border-color:#fff3a0; box-shadow:0 0 12px rgba(255,217,77,.7); }
+  .gc-slot2 { background:linear-gradient(160deg,#ff9a3d,#e23b2e); }
+  .gc-slot3 { background:linear-gradient(160deg,#37e0ff,#6a3df0); }
+  .gc-slot4 { background:linear-gradient(160deg,#ffb7d5,#e2547a); }
+  .gamecard .soon { margin-top:8px; background:rgba(0,0,0,.45); color:#ffe98a; font-weight:900; font-size:14px; border:1px solid #ffd94d; border-radius:999px; padding:8px 22px; }
+  .slotmachine.m-fruits { background:linear-gradient(180deg,#ff9a3d,#e23b2e); }
+  .slotmachine.m-diamond { background:linear-gradient(180deg,#37e0ff,#6a3df0); }
+  .slotmachine.m-sakura { background:linear-gradient(180deg,#ffb7d5,#e2547a); }
+  /* ===== v6：本物リール ===== */
+  .reelwins { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .reelwin { position:relative; background:#fff8ea; border-radius:12px; height:222px; overflow:hidden; box-shadow:inset 0 0 0 3px #d9c58a; }
+  .reelwin .strip { will-change:transform; }
+  .reelwin .cell { height:74px; display:flex; align-items:center; justify-content:center; font-size:44px; }
+  .reelwin .winline { position:absolute; left:0; right:0; top:74px; height:74px; border-top:2px solid rgba(212,175,55,.55); border-bottom:2px solid rgba(212,175,55,.55); pointer-events:none; }
+  .stoprow { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:12px; }
+  .stopbtn { background:linear-gradient(180deg,#ffdf6b,#e0a81c); color:#3a2800; border:none; border-radius:12px; padding:13px 0; font-size:16px; font-weight:900; cursor:pointer; box-shadow:0 3px 0 #8a6408; }
+  .stopbtn:disabled { opacity:.35; box-shadow:none; }
+  .stopbtn:active:not(:disabled) { transform:translateY(2px); box-shadow:0 1px 0 #8a6408; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">GOLDEN JAPAN（仮）</div>
+  <div class="wallet">
+    <div class="coinbox">🪙 <span id="coinVal">0</span></div>
+    <button class="bonusbtn" id="bonusBtn">+1,000</button>
+  </div>
+</header>
+
+<main>
+  <!-- ロビー -->
+  <section id="view-lobby" class="view active">
+    <div class="lobby-hero">
+      <h1>ゲームロビー</h1>
+      <p>遊びたいゲームを選んでください。コインは全ゲーム共通です。<br>※コインの換金はできません（試作用の架空通貨）</p>
+    </div>
+    <div class="tabbar" id="tabBar">
+      <button class="tabbtn sel" data-tab="slot">🎰 スロット</button>
+      <button class="tabbtn" data-tab="fish">🎣 フィッシング</button>
+      <button class="tabbtn" data-tab="horse">🏇 競馬</button>
+    </div>
+    <div class="gamerow" id="gameRow">
+      <button class="gamecard gc-slot" data-go="slot" data-machine="lucky" data-cat="slot">
+        <div class="ic">🎰</div>
+        <div class="tt">ラッキーセブン</div>
+        <div class="ds">3リール・5ライン<br>7が揃えば100倍！</div>
+        <div class="play">▶ あそぶ</div>
+      </button>
+      <button class="gamecard gc-slot2" data-go="slot" data-machine="fruits" data-cat="slot">
+        <div class="ic">🍒</div>
+        <div class="tt">フルーツパラダイス</div>
+        <div class="ds">フルーツいっぱいの<br>クラシックスロット</div>
+        <div class="play">▶ あそぶ</div>
+      </button>
+      <button class="gamecard gc-slot3" data-go="slot" data-machine="diamond" data-cat="slot">
+        <div class="ic">💎</div>
+        <div class="tt">ダイヤモンドラッシュ</div>
+        <div class="ds">高配当の<br>宝石スロット</div>
+        <div class="play">▶ あそぶ</div>
+      </button>
+      <button class="gamecard gc-slot4" data-go="slot" data-machine="sakura" data-cat="slot">
+        <div class="ic">🌸</div>
+        <div class="tt">サクラスロット</div>
+        <div class="ds">和風テーマの<br>新台スロット</div>
+        <div class="play">▶ あそぶ</div>
+      </button>
+      <button class="gamecard gc-fish" data-go="fish" data-cat="fish">
+        <div class="ic">🎣</div>
+        <div class="tt">フィッシング</div>
+        <div class="ds">大砲で魚を撃って捕まえよう<br>サメは20倍、金の魚は50倍！</div>
+        <div class="play">▶ あそぶ</div>
+      </button>
+      <button class="gamecard gc-horse" data-go="horse" data-cat="horse">
+        <div class="ic">🏇</div>
+        <div class="tt">競馬</div>
+        <div class="ds">5頭立てレース<br>推し馬に賭けて1着を当てよう！</div>
+        <div class="play">▶ あそぶ</div>
+      </button>
+    </div>
+    <div class="dots" id="gameDots"></div>
+    <div class="msg" id="lobbyMsg"></div>
+    <p style="text-align:center; font-size:12px; color:#e8ccff;">← 横にスワイプで台を選べます →</p>
+  </section>
+
+  <!-- スロット -->
+  <section id="view-slot" class="view">
+    <button class="backbtn" data-go="lobby">← ロビーへ戻る</button>
+    <h2 class="gametitle" id="slotTitle">🎰 ラッキーセブン</h2>
+    <div class="slotmachine" id="slotMachine">
+      <div class="reelwins" id="reelWins">
+        <div class="reelwin"><div class="strip" id="strip0"></div><div class="winline"></div></div>
+        <div class="reelwin"><div class="strip" id="strip1"></div><div class="winline"></div></div>
+        <div class="reelwin"><div class="strip" id="strip2"></div><div class="winline"></div></div>
+      </div>
+      <div class="stoprow">
+        <button class="stopbtn" id="stop0" disabled>STOP</button>
+        <button class="stopbtn" id="stop1" disabled>STOP</button>
+        <button class="stopbtn" id="stop2" disabled>STOP</button>
+      </div>
+    </div>
+    <div class="betrow"><span class="lbl">ベット：</span>
+      <button class="betbtn sel" data-sbet="10">10</button>
+      <button class="betbtn" data-sbet="50">50</button>
+      <button class="betbtn" data-sbet="100">100</button>
+    </div>
+    <button class="bigbtn" id="spinBtn">▶ スタート</button>
+    <div class="msg" id="slotMsg">スタートを押して、STOPボタンでリールを止めよう！</div>
+    <div class="panel paytable" id="payTable"></div>
+  </section>
+
+  <!-- フィッシング -->
+  <section id="view-fish" class="view">
+    <button class="backbtn" data-go="lobby">← ロビーへ戻る</button>
+    <h2 class="gametitle">🎣 フィッシング</h2>
+    <canvas id="fishCanvas" width="520" height="360"></canvas>
+    <div class="betrow"><span class="lbl">1発の弾：</span>
+      <button class="betbtn sel" data-fbet="10">10</button>
+      <button class="betbtn" data-fbet="20">20</button>
+      <button class="betbtn" data-fbet="50">50</button>
+      <span class="lbl">画面タップで発射！</span>
+    </div>
+    <div class="msg" id="fishMsg">魚をタップして撃とう！</div>
+    <div class="panel fishinfo">
+      捕まえると配当：🐠 小魚 <b style="color:#ffd94d">2倍</b>／🐡 中魚 <b style="color:#ffd94d">5倍</b>／🦈 サメ <b style="color:#ffd94d">20倍</b>／🐡✨ 金の魚 <b style="color:#ffd94d">50倍</b>（大きい魚ほど捕まえにくい）
+    </div>
+  </section>
+
+  <!-- 競馬 -->
+  <section id="view-horse" class="view">
+    <button class="backbtn" data-go="lobby">← ロビーへ戻る</button>
+    <h2 class="gametitle">🏇 競馬</h2>
+    <div id="horseList"></div>
+    <div class="betrow"><span class="lbl">ベット：</span>
+      <button class="betbtn sel" data-hbet="10">10</button>
+      <button class="betbtn" data-hbet="50">50</button>
+      <button class="betbtn" data-hbet="100">100</button>
+    </div>
+    <button class="bigbtn" id="raceBtn">レース開始</button>
+    <div class="msg" id="horseMsg">馬を選んでください</div>
+    <div class="track" id="track"></div>
+  </section>
+</main>
+
+<footer>ゴールデンジャパン（仮）試作 v6 ／ コインは換金できない架空通貨です</footer>
+
+<script>
+"use strict";
+/* ===== 共通：コイン管理 ===== */
+let coins = parseInt(localStorage.getItem('gj_coins') || '3000', 10);
+if (isNaN(coins) || coins < 0) coins = 3000;
+const coinVal = document.getElementById('coinVal');
+function saveCoins(){ localStorage.setItem('gj_coins', String(coins)); coinVal.textContent = coins.toLocaleString(); }
+saveCoins();
+document.getElementById('bonusBtn').addEventListener('click', function(){
+  coins += 1000; saveCoins();
+  this.disabled = true; this.textContent = '済';
+  setTimeout(()=>{ this.disabled = false; this.textContent = '+1,000'; }, 30000);
+});
+function pay(amount){ if (coins < amount) return false; coins -= amount; saveCoins(); return true; }
+function gain(amount){ coins += amount; saveCoins(); }
+
+/* ===== 画面遷移 ===== */
+document.querySelectorAll('[data-go]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-' + btn.dataset.go).classList.add('active');
+    if (btn.dataset.machine) loadMachine(btn.dataset.machine);
+    window.scrollTo(0,0);
+  });
+});
+
+/* ===== ロビー：タブ切替＋横スクロールのドット連動 ===== */
+const gameRow = document.getElementById('gameRow');
+const gameDotsEl = document.getElementById('gameDots');
+const allCards = Array.from(gameRow.querySelectorAll('.gamecard'));
+function visibleCards(){ return allCards.filter(c=>c.style.display !== 'none'); }
+function rebuildDots(){
+  const n = visibleCards().length;
+  gameDotsEl.innerHTML = '';
+  for (let i=0;i<n;i++){ const s = document.createElement('span'); if (i===0) s.className='on'; gameDotsEl.appendChild(s); }
+}
+function updateDots(){
+  const vis = visibleCards(); if (!vis.length) return;
+  const w = vis[0].offsetWidth + 14;
+  const idx = Math.min(vis.length-1, Math.max(0, Math.round(gameRow.scrollLeft / w)));
+  Array.from(gameDotsEl.children).forEach((s,i)=>s.classList.toggle('on', i===idx));
+}
+gameRow.addEventListener('scroll', updateDots, { passive:true });
+function selectTab(cat){
+  document.querySelectorAll('.tabbtn').forEach(b=>b.classList.toggle('sel', b.dataset.tab===cat));
+  allCards.forEach(c=>{ c.style.display = (c.dataset.cat===cat) ? '' : 'none'; });
+  gameRow.scrollLeft = 0;
+  document.getElementById('lobbyMsg').textContent = '';
+  rebuildDots();
+}
+document.querySelectorAll('.tabbtn').forEach(b=>b.addEventListener('click', ()=>selectTab(b.dataset.tab)));
+document.querySelectorAll('[data-soon]').forEach(c=>c.addEventListener('click', ()=>{
+  const m = document.getElementById('lobbyMsg');
+  m.textContent = '「' + c.dataset.soon + '」は準備中です。近日公開！';
+  m.className = 'msg';
+}));
+selectTab('slot');
+
+/* ===== スロット（4台共通・本物リール方式） ===== */
+const MACHINES = {
+  lucky:   { name:'ラッキーセブン', icon:'🎰', cls:'', pair:'🍒',
+    symbols:[ {s:'🍒',w:26,pay:8}, {s:'🍋',w:24,pay:10}, {s:'🔔',w:20,pay:20}, {s:'⭐',w:15,pay:30}, {s:'💎',w:10,pay:50}, {s:'7️⃣',w:5,pay:100} ] },
+  fruits:  { name:'フルーツパラダイス', icon:'🍒', cls:'m-fruits', pair:'🍒',
+    symbols:[ {s:'🍒',w:30,pay:5}, {s:'🍋',w:26,pay:6}, {s:'🍊',w:22,pay:8}, {s:'🍇',w:16,pay:15}, {s:'🍓',w:12,pay:25}, {s:'🍉',w:6,pay:60} ] },
+  diamond: { name:'ダイヤモンドラッシュ', icon:'💎', cls:'m-diamond', wild:'🌟',
+    symbols:[ {s:'🔷',w:30,pay:10}, {s:'🔶',w:24,pay:15}, {s:'💜',w:18,pay:25}, {s:'💚',w:12,pay:40}, {s:'💎',w:7,pay:80}, {s:'🌟',w:4,pay:200} ] },
+  sakura:  { name:'サクラスロット', icon:'🌸', cls:'m-sakura', pair:'🌸', bonusSym:'🏮', bonusFree:5,
+    symbols:[ {s:'🌸',w:26,pay:8}, {s:'🍡',w:24,pay:10}, {s:'🍵',w:20,pay:18}, {s:'🎋',w:15,pay:30}, {s:'🏮',w:10,pay:50}, {s:'🌕',w:5,pay:100} ] },
+};
+const CELL_H = 74, STRIP_LEN = 64, OCC = [22, 52];
+let curMachine = MACHINES.lucky, curBag = [];
+function buildBag(){ curBag = []; curMachine.symbols.forEach(o=>{ for(let i=0;i<o.w;i++) curBag.push(o); }); }
+const pickS = ()=> curBag[Math.floor(Math.random()*curBag.length)];
+let slotBet = 10, spinning = false;
+document.querySelectorAll('[data-sbet]').forEach(b=>b.addEventListener('click', ()=>{
+  document.querySelectorAll('[data-sbet]').forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel'); slotBet = parseInt(b.dataset.sbet,10);
+}));
+const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,4,8],[2,4,6]];
+/* リール状態：strip=絵柄列, pos=現在位置(絵柄単位), target=確定3つ, occIdx=停止候補 */
+const reels = [0,1,2].map(i=>({
+  el: document.getElementById('strip' + i),
+  btn: document.getElementById('stop' + i),
+  strip: [], pos: 0, speed: 0, state: 'idle', stopAt: null, visible: ['⭐','⭐','⭐'],
+}));
+function renderStrip(r){
+  r.el.innerHTML = r.strip.map(s=>'<div class="cell">' + s + '</div>').join('');
+}
+function setReelPos(r){
+  r.el.style.transform = 'translateY(' + (-(r.pos * CELL_H)) + 'px)';
+}
+function buildStrip(r, target){
+  const strip = r.visible.slice();
+  while (strip.length < STRIP_LEN) strip.push(pickS().s);
+  OCC.forEach(o=>{ strip[o] = target[0]; strip[o+1] = target[1]; strip[o+2] = target[2]; });
+  r.strip = strip; r.pos = 0; r.stopAt = null; r.state = 'spin'; r.speed = 16;
+  renderStrip(r); setReelPos(r);
+}
+function loadMachine(key){
+  curMachine = MACHINES[key]; buildBag();
+  document.getElementById('slotTitle').textContent = curMachine.icon + ' ' + curMachine.name;
+  document.getElementById('slotMachine').className = 'slotmachine ' + curMachine.cls;
+  document.getElementById('slotMsg').textContent = 'スタートを押して、STOPボタンでリールを止めよう！';
+  reels.forEach(r=>{
+    r.visible = [pickS().s, pickS().s, pickS().s];
+    r.strip = r.visible.slice(); r.pos = 0; r.state = 'idle';
+    renderStrip(r); setReelPos(r);
+    r.btn.disabled = true;
+  });
+  const parts = curMachine.symbols.slice().sort((a,b)=>b.pay-a.pay)
+    .map(o=> o.s + o.s + o.s + ' <b>' + o.pay + '倍</b>');
+  let html = '配当（1ラインあたり）：' + parts.join('／') + '<br>ラインは横3本＋斜め2本の計5ライン。ベットは1スピンの合計額です。';
+  if (curMachine.pair) html += '<br>' + curMachine.pair + ' が1ラインに2つで <b>2倍</b>。';
+  if (curMachine.wild) html += '<br>' + curMachine.wild + ' はワイルド（どの絵柄にもなる）。';
+  if (curMachine.bonusSym) html += '<br>' + curMachine.bonusSym + ' が1ラインに3つ揃うと <b>フリースピン' + curMachine.bonusFree + '回</b>！';
+  document.getElementById('payTable').innerHTML = html;
+}
+function evalLine(lineSyms){
+  const M = curMachine;
+  if (M.wild){
+    let best = 0;
+    M.symbols.forEach(t=>{ if (lineSyms.every(x=> x===t.s || x===M.wild)) best = Math.max(best, t.pay); });
+    return best;
+  }
+  const [a,b,c] = lineSyms;
+  if (a===b && b===c){ const t = M.symbols.find(o=>o.s===a); return t ? t.pay : 0; }
+  if (M.pair){ const n = lineSyms.filter(x=>x===M.pair).length; if (n>=2) return 2; }
+  return 0;
+}
+let rafId = null, lastTs = 0, spinCtx = null;
+function reelLoop(ts){
+  const dt = Math.min(0.05, (ts - lastTs) / 1000 || 0.016); lastTs = ts;
+  let anySpin = false;
+  reels.forEach(r=>{
+    if (r.state === 'spin'){
+      anySpin = true;
+      if (r.stopAt !== null){
+        const remain = r.stopAt - r.pos;
+        if (remain <= 0.02){ r.pos = r.stopAt; r.state = 'stopped'; r.visible = [r.strip[r.stopAt], r.strip[r.stopAt+1], r.strip[r.stopAt+2]]; setReelPos(r); r.btn.disabled = true; onReelStopped(); return; }
+        r.speed = Math.max(2.2, remain * 6);
+      } else if (r.pos > OCC[1] - 4){
+        requestStop(reels.indexOf(r)); // 押し忘れ防止の自動停止
+      }
+      r.pos += r.speed * dt;
+      if (r.stopAt !== null && r.pos > r.stopAt) r.pos = r.stopAt;
+      setReelPos(r);
+    }
+  });
+  if (anySpin || reels.some(r=>r.state==='spin')) rafId = requestAnimationFrame(reelLoop);
+  else rafId = null;
+}
+function requestStop(i){
+  const r = reels[i];
+  if (r.state !== 'spin' || r.stopAt !== null) return;
+  const cand = OCC.find(o=> o > r.pos + 1.2) ?? OCC[OCC.length-1];
+  r.stopAt = cand;
+}
+reels.forEach((r,i)=> r.btn.addEventListener('click', ()=>requestStop(i)));
+function onReelStopped(){
+  if (!reels.every(r=> r.state === 'stopped')) return;
+  const ctx = spinCtx;
+  const grid = [];
+  for (let row=0; row<3; row++) for (let col=0; col<3; col++) grid[row*3+col] = reels[col].visible[row];
+  let win = 0; const perLine = slotBet / 5;
+  LINES.forEach(line=>{ win += perLine * evalLine(line.map(i=>grid[i])); });
+  win = Math.round(win);
+  const msg = document.getElementById('slotMsg');
+  let bonusHit = false;
+  if (curMachine.bonusSym) bonusHit = LINES.some(line=> line.every(i=> grid[i] === curMachine.bonusSym));
+  if (win > 0) gain(win);
+  if (ctx.chain) ctx.chain.total += win;
+  if (bonusHit){
+    if (ctx.chain) ctx.chain.left += curMachine.bonusFree;
+    else ctx.chain = { left: curMachine.bonusFree, total: 0 };
+    msg.textContent = '🎉 ボーナス！フリースピン突入！'; msg.className = 'msg';
+  } else if (ctx.chain && ctx.isFree){
+    msg.textContent = 'フリースピン中… 残り' + ctx.chain.left + '回（合計 ' + ctx.chain.total.toLocaleString() + 'コイン）';
+    msg.className = 'msg';
+  } else if (win > 0){
+    msg.textContent = '🎉 ' + win.toLocaleString() + 'コイン獲得！'; msg.className = 'msg';
+  } else {
+    msg.textContent = 'はずれ…もう一回！'; msg.className = 'msg lose';
+  }
+  if (ctx.chain && ctx.chain.left > 0){
+    ctx.chain.left--;
+    setTimeout(()=>startSpin(true, ctx.chain), 900);
+  } else {
+    if (ctx.isFree && ctx.chain){
+      msg.textContent = 'フリースピン終了！ 合計 ' + ctx.chain.total.toLocaleString() + 'コイン獲得🎉';
+      msg.className = 'msg';
+    }
+    spinning = false; spinCtx = null;
+    document.getElementById('spinBtn').disabled = false;
+  }
+}
+function startSpin(isFree, chain){
+  const targets = [0,1,2].map(()=> [pickS().s, pickS().s, pickS().s]);
+  spinCtx = { isFree, chain };
+  reels.forEach((r,i)=>{ buildStrip(r, targets[i]); r.btn.disabled = false; });
+  if (isFree) reels.forEach((r,i)=> setTimeout(()=>requestStop(i), 500 + i*450));
+  lastTs = 0;
+  if (!rafId) rafId = requestAnimationFrame(reelLoop);
+}
+document.getElementById('spinBtn').addEventListener('click', ()=>{
+  if (spinning) return;
+  const msg = document.getElementById('slotMsg');
+  if (!pay(slotBet)){ msg.textContent = 'コインが足りません'; msg.className = 'msg lose'; return; }
+  spinning = true;
+  document.getElementById('spinBtn').disabled = true;
+  msg.textContent = '';
+  startSpin(false, null);
+});
+loadMachine('lucky');
+
+/* ===== フィッシング ===== */
+const cv = document.getElementById('fishCanvas'), ctx = cv.getContext('2d');
+let fishBet = 10;
+document.querySelectorAll('[data-fbet]').forEach(b=>b.addEventListener('click', ()=>{
+  document.querySelectorAll('[data-fbet]').forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel'); fishBet = parseInt(b.dataset.fbet,10);
+}));
+const FISH_TYPES = [
+  { e:'🐠', size:30, mult:2,  catchP:0.75, speed:1.2, w:50 },
+  { e:'🐡', size:38, mult:5,  catchP:0.45, speed:0.9, w:30 },
+  { e:'🦈', size:56, mult:20, catchP:0.18, speed:1.5, w:14 },
+  { e:'✨🐡', size:40, mult:50, catchP:0.08, speed:1.8, w:6 },
+];
+let fishes = [], bullets = [];
+function spawnFish(){
+  const bag = []; FISH_TYPES.forEach((t,i)=>{ for(let k=0;k<t.w;k++) bag.push(i); });
+  const t = FISH_TYPES[bag[Math.floor(Math.random()*bag.length)]];
+  const dir = Math.random() < 0.5 ? 1 : -1;
+  fishes.push({ t, x: dir>0 ? -60 : cv.width+60, y: 30 + Math.random()*(cv.height-130), dir, sp: t.speed*(0.7+Math.random()*0.7), ph: Math.random()*6.28 });
+}
+for (let i=0;i<6;i++){ spawnFish(); fishes[i].x = Math.random()*cv.width; }
+let cannonAngle = -Math.PI/2;
+function drawFish(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  for (let i=0;i<14;i++){ const bx=(i*97)%cv.width, by=(i*61)%cv.height; ctx.beginPath(); ctx.arc(bx,by,3,0,6.29); ctx.fill(); }
+  fishes.forEach(f=>{
+    ctx.save(); ctx.translate(f.x, f.y + Math.sin(f.ph)*6);
+    if (f.dir<0) ctx.scale(-1,1);
+    ctx.font = f.t.size + 'px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(f.t.e, 0, 0); ctx.restore();
+  });
+  bullets.forEach(b=>{ ctx.fillStyle='#ffe98a'; ctx.beginPath(); ctx.arc(b.x,b.y,5,0,6.29); ctx.fill(); });
+  const cx = cv.width/2, cy = cv.height-8;
+  ctx.save(); ctx.translate(cx,cy); ctx.rotate(cannonAngle+Math.PI/2);
+  ctx.fillStyle = '#d4af37'; ctx.fillRect(-7,-38,14,38);
+  ctx.fillStyle = '#8a6408'; ctx.beginPath(); ctx.arc(0,0,16,0,6.29); ctx.fill();
+  ctx.restore();
+  ctx.font = '30px serif'; ctx.textAlign='center'; ctx.fillText('🐙', cx, cy-2);
+}
+function fishLoop(){
+  fishes.forEach(f=>{ f.x += f.dir * f.sp; f.ph += 0.05; });
+  fishes = fishes.filter(f=> f.x > -80 && f.x < cv.width+80);
+  while (fishes.length < 7) spawnFish();
+  bullets.forEach(b=>{ b.x += b.vx; b.y += b.vy; });
+  bullets = bullets.filter(b=> b.x>-10 && b.x<cv.width+10 && b.y>-10 && b.y<cv.height+10);
+  // 当たり判定
+  for (let bi=bullets.length-1; bi>=0; bi--){
+    const b = bullets[bi]; let hit = false;
+    for (let fi=fishes.length-1; fi>=0; fi--){
+      const f = fishes[fi];
+      if (Math.hypot(b.x-f.x, b.y-f.y) < f.t.size*0.55){
+        hit = true;
+        if (Math.random() < f.t.catchP){
+          const win = fishBet * f.t.mult; gain(win);
+          const m = document.getElementById('fishMsg');
+          m.textContent = '🎉 ' + f.t.e + ' を捕まえた！ +' + win.toLocaleString() + 'コイン';
+          m.className = 'msg';
+          fishes.splice(fi,1);
+        }
+        break;
+      }
+    }
+    if (hit) bullets.splice(bi,1);
+  }
+  drawFish();
+  requestAnimationFrame(fishLoop);
+}
+fishLoop();
+cv.addEventListener('pointerdown', e=>{
+  const r = cv.getBoundingClientRect();
+  const x = (e.clientX - r.left) * (cv.width / r.width);
+  const y = (e.clientY - r.top) * (cv.height / r.height);
+  const cx = cv.width/2, cy = cv.height-8;
+  cannonAngle = Math.atan2(y-cy, x-cx);
+  const m = document.getElementById('fishMsg');
+  if (!pay(fishBet)){ m.textContent = 'コインが足りません'; m.className='msg lose'; return; }
+  const sp = 7;
+  bullets.push({ x:cx, y:cy-30, vx: Math.cos(cannonAngle)*sp, vy: Math.sin(cannonAngle)*sp });
+});
+
+/* ===== 競馬 ===== */
+const HORSES = [
+  { e:'🐎', name:'サクラエンペラー', odds:2.5, power:0.9 },
+  { e:'🏇', name:'ディープボルト',   odds:3.2, power:0.8 },
+  { e:'🐴', name:'ゴールドシップJr', odds:4.0, power:0.68 },
+  { e:'🦄', name:'ユメノユニコーン', odds:5.5, power:0.55 },
+  { e:'🐢', name:'ド根性カメ吉',     odds:9.0, power:0.4 },
+];
+let horseBet = 10, selHorse = 0, racing = false;
+document.querySelectorAll('[data-hbet]').forEach(b=>b.addEventListener('click', ()=>{
+  document.querySelectorAll('[data-hbet]').forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel'); horseBet = parseInt(b.dataset.hbet,10);
+}));
+const horseList = document.getElementById('horseList');
+HORSES.forEach((h,i)=>{
+  const b = document.createElement('button');
+  b.className = 'horseopt' + (i===0 ? ' sel' : '');
+  b.innerHTML = '<span class="hn">' + h.e + '</span><span class="nm">' + (i+1) + '番 ' + h.name + '</span><span class="od">' + h.odds.toFixed(1) + '倍</span>';
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('.horseopt').forEach(x=>x.classList.remove('sel'));
+    b.classList.add('sel'); selHorse = i;
+    document.getElementById('horseMsg').textContent = h.name + ' を選択中';
+  });
+  horseList.appendChild(b);
+});
+const track = document.getElementById('track');
+function drawTrack(pos){
+  track.innerHTML = '';
+  HORSES.forEach((h,i)=>{
+    const lane = document.createElement('div'); lane.className='lane';
+    lane.innerHTML = '<div class="no">' + (i+1) + '</div><div class="rail"><div class="runner" style="left:' + (pos[i]*88) + '%">' + h.e + '</div><div class="fin">🏁</div></div>';
+    track.appendChild(lane);
+  });
+}
+drawTrack([0,0,0,0,0]);
+document.getElementById('raceBtn').addEventListener('click', ()=>{
+  if (racing) return;
+  const msg = document.getElementById('horseMsg');
+  if (!pay(horseBet)){ msg.textContent = 'コインが足りません'; msg.className='msg lose'; return; }
+  racing = true; document.getElementById('raceBtn').disabled = true;
+  msg.textContent = 'レース中…！'; msg.className='msg';
+  const pos = [0,0,0,0,0], spd = HORSES.map(h=> h.power), finishOrder = [];
+  const iv = setInterval(()=>{
+    let done = true;
+    for (let i=0;i<5;i++){
+      if (pos[i] < 1){
+        pos[i] += (0.008 + Math.random()*0.02) * (0.55 + spd[i]*0.7);
+        if (pos[i] < 1) done = false;
+        else { pos[i] = 1; if (!finishOrder.includes(i)) finishOrder.push(i); }
+      }
+    }
+    drawTrack(pos);
+    if (done){
+      clearInterval(iv);
+      const winner = finishOrder[0];
+      if (winner === selHorse){
+        const win = Math.round(horseBet * HORSES[winner].odds); gain(win);
+        msg.textContent = '🎉 ' + HORSES[winner].name + ' が1着！ +' + win.toLocaleString() + 'コイン';
+        msg.className = 'msg';
+      } else {
+        msg.textContent = '1着は ' + HORSES[winner].name + ' でした…';
+        msg.className = 'msg lose';
+      }
+      racing = false; document.getElementById('raceBtn').disabled = false;
+    }
+  }, 60);
+});
+</script>
+</body>
+</html>
